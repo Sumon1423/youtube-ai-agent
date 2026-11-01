@@ -69,10 +69,12 @@ export default function Home() {
 
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [analyticsSyncing, setAnalyticsSyncing] = useState(false);
 
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("success");
   const [syncResult, setSyncResult] = useState(null);
+  const [analyticsResult, setAnalyticsResult] = useState(null);
 
   const [channels, setChannels] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -258,23 +260,18 @@ export default function Home() {
       });
 
       const rawResponse = await response.text();
+      let result;
 
-let result;
-
-try {
-  result = JSON.parse(rawResponse);
-} catch {
-  throw new Error(
-    `API returned non-JSON response. HTTP ${response.status}. Response: ${rawResponse.slice(0, 300)}`
-  );
-}
-
-if (!response.ok || !result.success) {
-  throw new Error(result.error || "YouTube sync failed.");
-}
+      try {
+        result = JSON.parse(rawResponse);
+      } catch {
+        throw new Error(
+          `YouTube sync returned a non-JSON response. HTTP ${response.status}. ${rawResponse.slice(0, 250)}`
+        );
+      }
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "YouTube sync failed.");
+        throw new Error(result.error || `YouTube sync failed (HTTP ${response.status}).`);
       }
 
       setSyncResult(result);
@@ -289,6 +286,61 @@ if (!response.ok || !result.success) {
       setNoticeType("error");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  // Sync YouTube Analytics and audience-retention data
+  async function handleAnalyticsSync() {
+    if (analyticsSyncing) return;
+
+    setAnalyticsSyncing(true);
+    setNotice("");
+    setAnalyticsResult(null);
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error || !data.session?.access_token) {
+        throw new Error("Login session expired. Please log in again.");
+      }
+
+      const response = await fetch("/api/youtube/analytics", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+        cache: "no-store",
+      });
+
+      const rawResponse = await response.text();
+      let result;
+
+      try {
+        result = JSON.parse(rawResponse);
+      } catch {
+        throw new Error(
+          `Analytics API returned a non-JSON response. HTTP ${response.status}. ${rawResponse.slice(0, 250)}`
+        );
+      }
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error || `Analytics synchronization failed (HTTP ${response.status}).`
+        );
+      }
+
+      setAnalyticsResult(result);
+      setNotice(
+        `Analytics sync completed. ${result.videosUpdated || 0} videos updated.`
+      );
+      setNoticeType("success");
+
+      await loadDashboardData(user.id);
+    } catch (error) {
+      setNotice(error.message || "Analytics synchronization failed.");
+      setNoticeType("error");
+    } finally {
+      setAnalyticsSyncing(false);
     }
   }
 
@@ -346,7 +398,7 @@ if (!response.ok || !result.success) {
         </div>
 
         <div className="hero">
-          <span className="eyebrow">AI AGENT STATUS</span>
+                      <span className="eyebrow">AI AGENT STATUS</span>
           <h2>
             {channels.length
               ? "Your YouTube channel is connected."
@@ -400,6 +452,34 @@ if (!response.ok || !result.success) {
                 Found: {syncResult.videosFound} ·
                 Saved: {syncResult.videosSynced} ·
                 Failed: {syncResult.videosFailed}
+              </div>
+            )}
+          </div>
+        )}
+
+        {channels.length > 0 && (
+          <div className="sync-card analytics-card">
+            <div>
+              <h3>Personalized YouTube Analytics</h3>
+              <p>
+                Import available watch time, average view duration,
+                engagement and audience-retention data for your videos.
+              </p>
+            </div>
+
+            <button
+              className="sync-button"
+              onClick={handleAnalyticsSync}
+              disabled={analyticsSyncing}
+            >
+              {analyticsSyncing ? "Analyzing..." : "Sync Analytics ↗"}
+            </button>
+
+            {analyticsResult && (
+              <div className="sync-result">
+                Updated: {analyticsResult.videosUpdated || 0} ·
+                Retention curves: {analyticsResult.retentionCurvesSaved || 0} ·
+                Missing metrics: {analyticsResult.videosWithoutMetrics || 0}
               </div>
             )}
           </div>
@@ -695,7 +775,7 @@ if (!response.ok || !result.success) {
       </nav>
 
       <style jsx global>{`
-        * { box-sizing: border-box; }
+              * { box-sizing: border-box; }
 
         body {
           margin: 0;
