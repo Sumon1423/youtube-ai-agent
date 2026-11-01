@@ -6,116 +6,24 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
 const intelligence = [
-  {
-    icon: "📡",
-    title: "Channel Monitor",
-    desc: "Monitor channel performance and detect changes.",
-    status: "Waiting",
-  },
-  {
-    icon: "🩺",
-    title: "Video Doctor",
-    desc: "Find reasons behind low-performing videos.",
-    status: "Waiting",
-  },
-  {
-    icon: "🔎",
-    title: "SEO Intelligence",
-    desc: "Review titles, descriptions and keywords.",
-    status: "Waiting",
-  },
-  {
-    icon: "📈",
-    title: "Trend Radar",
-    desc: "Discover trending topics for USA viewers.",
-    status: "Waiting",
-  },
-  {
-    icon: "👥",
-    title: "Audience Insights",
-    desc: "Understand viewer behavior and interests.",
-    status: "Waiting",
-  },
-  {
-    icon: "💬",
-    title: "Comment Center",
-    desc: "Monitor comments and prepare replies.",
-    status: "Waiting",
-  },
-  {
-    icon: "🎯",
-    title: "Competitor Watch",
-    desc: "Track similar channels and content.",
-    status: "Waiting",
-  },
-  {
-    icon: "🧠",
-    title: "Growth Intelligence",
-    desc: "Build strategies using channel data.",
-    status: "Waiting",
-  },
+  { icon: "📡", title: "Channel Monitor", desc: "Monitor channel performance and detect changes." },
+  { icon: "🩺", title: "Video Doctor", desc: "Find reasons behind low-performing videos." },
+  { icon: "🔎", title: "SEO Intelligence", desc: "Review titles, descriptions and keywords." },
+  { icon: "📈", title: "Trend Radar", desc: "Discover trending topics for USA viewers." },
+  { icon: "👥", title: "Audience Insights", desc: "Understand viewer behavior and interests." },
+  { icon: "💬", title: "Comment Center", desc: "Monitor comments and prepare replies." },
+  { icon: "🎯", title: "Competitor Watch", desc: "Track similar channels and content." },
+  { icon: "🧠", title: "Growth Intelligence", desc: "Build strategies using channel data." },
 ];
 
 const production = [
-  {
-    icon: "💡",
-    title: "Video Ideas",
-    desc: "AI-selected video topics and concepts.",
-  },
-  {
-    icon: "✍️",
-    title: "Script Studio",
-    desc: "Create and review video scripts.",
-  },
-  {
-    icon: "🖼️",
-    title: "Asset Manager",
-    desc: "Manage images, clips and visual assets.",
-  },
-  {
-    icon: "🎙️",
-    title: "Voice Studio",
-    desc: "Generate narration for your videos.",
-  },
-  {
-    icon: "🎬",
-    title: "AI Editor",
-    desc: "Editing style, captions, transitions and SFX.",
-  },
-  {
-    icon: "▶️",
-    title: "Video Preview",
-    desc: "Review the final video before publishing.",
-  },
-  {
-    icon: "🚀",
-    title: "Publishing",
-    desc: "Prepare and publish approved videos.",
-  },
-];
-
-const initialActivities = [
-  {
-    icon: "🔐",
-    title: "Authentication",
-    detail: "Account connected successfully",
-    time: "Current session",
-    status: "Completed",
-  },
-  {
-    icon: "📊",
-    title: "Channel analysis",
-    detail: "Waiting for YouTube connection",
-    time: "Not started",
-    status: "Waiting",
-  },
-  {
-    icon: "🤖",
-    title: "AI Agent",
-    detail: "Automation system is not configured yet",
-    time: "Not started",
-    status: "Waiting",
-  },
+  { icon: "💡", title: "Video Ideas", desc: "AI-selected video topics and concepts." },
+  { icon: "✍️", title: "Script Studio", desc: "Create and review video scripts." },
+  { icon: "🖼️", title: "Asset Manager", desc: "Manage images, clips and visual assets." },
+  { icon: "🎙️", title: "Voice Studio", desc: "Generate narration for your videos." },
+  { icon: "🎬", title: "AI Editor", desc: "Captions, transitions, zooms and SFX." },
+  { icon: "▶️", title: "Video Preview", desc: "Review the final video before publishing." },
+  { icon: "🚀", title: "Publishing", desc: "Prepare and publish approved videos." },
 ];
 
 const tabs = [
@@ -125,6 +33,43 @@ const tabs = [
   { id: "More", icon: "•••", label: "More" },
 ];
 
+function Status({ children }) {
+  const value = String(children || "Waiting").toLowerCase();
+
+  let type = "waiting";
+  if (["completed", "approved", "connected"].includes(value)) type = "success";
+  if (["running", "processing"].includes(value)) type = "running";
+  if (["failed", "rejected"].includes(value)) type = "danger";
+
+  return <span className={`status ${type}`}>{children || "Waiting"}</span>;
+}
+
+function SectionTitle({ title, subtitle, action }) {
+  return (
+    <div className="section-title">
+      <div>
+        <h2>{title}</h2>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {action && <span className="section-action">{action}</span>}
+    </div>
+  );
+}
+
+function ModuleCard({ icon, title, desc, status, onClick }) {
+  return (
+    <button className="module-card" onClick={onClick}>
+      <div className="module-top">
+        <span className="module-icon">{icon}</span>
+        {status && <Status>{status}</Status>}
+      </div>
+      <h3>{title}</h3>
+      <p>{desc}</p>
+      <div className="module-arrow">Explore <span>↗</span></div>
+    </button>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
 
@@ -132,9 +77,18 @@ export default function Home() {
   const [checking, setChecking] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState("Home");
+
   const [automation, setAutomation] = useState(true);
   const [notifications, setNotifications] = useState(true);
 
+  const [dbJobs, setDbJobs] = useState([]);
+  const [dbApprovals, setDbApprovals] = useState([]);
+  const [dbReports, setDbReports] = useState([]);
+  const [dbChannels, setDbChannels] = useState([]);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState("");
+
+  // Authentication check
   useEffect(() => {
     let mounted = true;
 
@@ -175,6 +129,71 @@ export default function Home() {
     };
   }, [router]);
 
+  // Load user's database information
+  useEffect(() => {
+    if (!user) return;
+
+    let mounted = true;
+
+    async function loadDashboardData() {
+      setDbLoading(true);
+      setDbError("");
+
+      const results = await Promise.all([
+        supabase
+          .from("agent_jobs")
+          .select("id,task_type,status,task_details,result,error_message,created_at,completed_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10),
+
+        supabase
+          .from("approvals")
+          .select("id,action_type,status,created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(20),
+
+        supabase
+          .from("reports")
+          .select("id,report_type,report_data,created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10),
+
+        supabase
+          .from("channels")
+          .select("id,channel_name,channel_url,connection_status,created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
+
+      if (!mounted) return;
+
+      const errors = results
+        .filter((result) => result.error)
+        .map((result) => result.error.message);
+
+      setDbJobs(results[0].data || []);
+      setDbApprovals(results[1].data || []);
+      setDbReports(results[2].data || []);
+      setDbChannels(results[3].data || []);
+
+      if (errors.length) {
+        setDbError(errors.join(" | "));
+      }
+
+      setDbLoading(false);
+    }
+
+    loadDashboardData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
   async function handleLogout() {
     if (loggingOut) return;
 
@@ -201,42 +220,22 @@ export default function Home() {
     );
   }
 
-  function SectionTitle({ title, subtitle, action }) {
-    return (
-      <div className="section-title">
-        <div>
-          <h2>{title}</h2>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
-        {action && <span className="section-action">{action}</span>}
-      </div>
-    );
-  }
+  // Database statistics
+  const completedJobs = dbJobs.filter(
+    (job) => job.status?.toLowerCase() === "completed"
+  ).length;
 
-  function Status({ children }) {
-    const type =
-      children === "Completed"
-        ? "success"
-        : children === "Running"
-        ? "running"
-        : "waiting";
+  const failedJobs = dbJobs.filter(
+    (job) => job.status?.toLowerCase() === "failed"
+  ).length;
 
-    return <span className={`status ${type}`}>{children}</span>;
-  }
+  const pendingApprovals = dbApprovals.filter(
+    (item) => item.status?.toLowerCase() === "pending"
+  ).length;
 
-  function ModuleCard({ icon, title, desc, status, onClick }) {
-    return (
-      <button className="module-card" onClick={onClick || (() => {})}>
-        <div className="module-top">
-          <span className="module-icon">{icon}</span>
-          {status && <Status>{status}</Status>}
-        </div>
-        <h3>{title}</h3>
-        <p>{desc}</p>
-        <div className="module-arrow">Explore <span>↗</span></div>
-      </button>
-    );
-  }
+  const runningJobs = dbJobs.filter(
+    (job) => ["running", "processing"].includes(job.status?.toLowerCase())
+  ).length;
 
   function renderHome() {
     return (
@@ -274,6 +273,17 @@ export default function Home() {
           <div className="robot-art">🤖</div>
         </div>
 
+        {dbError && (
+          <div className="database-error">
+            <strong>Database Error</strong>
+            <p>{dbError}</p>
+          </div>
+        )}
+
+        {dbLoading && (
+          <p className="database-message">Loading database information...</p>
+        )}
+
         <SectionTitle
           title="Workspace Overview"
           subtitle="Your agent's operational status"
@@ -282,53 +292,126 @@ export default function Home() {
         <div className="stats-grid">
           <div className="stat-card">
             <span className="stat-icon">⚠️</span>
-            <strong>—</strong>
-            <p>Detected Issues</p>
+            <strong>{failedJobs}</strong>
+            <p>Failed Tasks</p>
           </div>
           <div className="stat-card">
             <span className="stat-icon">✓</span>
-            <strong>0</strong>
+            <strong>{completedJobs}</strong>
             <p>Completed Tasks</p>
           </div>
           <div className="stat-card">
             <span className="stat-icon">⌛</span>
-            <strong>0</strong>
+            <strong>{pendingApprovals}</strong>
             <p>Pending Approvals</p>
           </div>
           <div className="stat-card">
             <span className="stat-icon">◉</span>
-            <strong className="small-stat">Inactive</strong>
+            <strong className="small-stat">
+              {runningJobs > 0 ? "Running" : "Inactive"}
+            </strong>
             <p>Agent Status</p>
           </div>
         </div>
 
         <SectionTitle
-          title="Agent Activity"
-          subtitle="Recent workspace events"
-          action="View all"
+          title="Connected Channels"
+          subtitle="Channels saved in your account"
         />
 
-        <div className="activity-card">
-          {initialActivities.map((item, index) => (
-            <div className="activity-item" key={index}>
-              <div className="activity-icon">{item.icon}</div>
-              <div className="activity-info">
-                <strong>{item.title}</strong>
-                <p>{item.detail}</p>
-                <span>{item.time}</span>
+        {dbChannels.length === 0 ? (
+          <div className="empty-card">
+            <span>📺</span>
+            <strong>No YouTube channel connected</strong>
+            <p>Your channel information will appear here after connection.</p>
+          </div>
+        ) : (
+          <div className="activity-card">
+            {dbChannels.map((channel) => (
+              <div className="activity-item" key={channel.id}>
+                <div className="activity-icon">📺</div>
+                <div className="activity-info">
+                  <strong>{channel.channel_name || "YouTube Channel"}</strong>
+                  <p>{channel.channel_url || "Channel URL unavailable"}</p>
+                </div>
+                <Status>{channel.connection_status || "Waiting"}</Status>
               </div>
-              <Status>{item.status}</Status>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
+        <SectionTitle
+          title="Agent Activity"
+          subtitle="Latest tasks from your database"
+        />
+
+        {dbJobs.length === 0 ? (
+          <div className="empty-card">
+            <span>🤖</span>
+            <strong>No agent activity yet</strong>
+            <p>New tasks will appear here when the agent starts working.</p>
+          </div>
+        ) : (
+          <div className="activity-card">
+            {dbJobs.map((job) => (
+              <div className="activity-item" key={job.id}>
+                <div className="activity-icon">⚙️</div>
+                <div className="activity-info">
+                  <strong>{job.task_type}</strong>
+                  <p>
+                    {job.error_message ||
+                      job.task_details?.description ||
+                      "Agent task"}
+                  </p>
+                  <span>
+                    {job.created_at
+                      ? new Date(job.created_at).toLocaleString()
+                      : "Date unavailable"}
+                  </span>
+                </div>
+                <Status>{job.status || "Waiting"}</Status>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <SectionTitle
+          title="Recent Reports"
+          subtitle="Reports saved by your agent"
+        />
+
+        {dbReports.length === 0 ? (
+          <div className="empty-card">
+            <span>📊</span>
+            <strong>No reports available</strong>
+            <p>Generated reports will appear here.</p>
+          </div>
+        ) : (
+          <div className="activity-card">
+            {dbReports.map((report) => (
+              <div className="activity-item" key={report.id}>
+                <div className="activity-icon">📄</div>
+                <div className="activity-info">
+                  <strong>{report.report_type || "Agent Report"}</strong>
+                  <p>
+                    {report.created_at
+                      ? new Date(report.created_at).toLocaleString()
+                      : "Date unavailable"}
+                  </p>
+                </div>
+                <Status>Completed</Status>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="notice-card">
           <span>ℹ️</span>
           <div>
-            <strong>Setup required</strong>
+            <strong>Integration status</strong>
             <p>
-              Your dashboard is connected to your account.
-              YouTube integration and AI services are not connected yet.
+              Dashboard is connected to Supabase. YouTube API and AI
+              automation services still need to be configured.
             </p>
           </div>
         </div>
@@ -350,8 +433,7 @@ export default function Home() {
           <div>
             <strong>AI Intelligence Center</strong>
             <p>
-              Monitor, analyze and discover opportunities
-              using your channel data.
+              Monitor, analyze and discover opportunities using your channel data.
             </p>
           </div>
         </div>
@@ -367,7 +449,7 @@ export default function Home() {
               key={item.title}
               {...item}
               onClick={() =>
-                alert(`${item.title}: YouTube integration is not connected yet.`)
+                alert(`${item.title}: AI service is not connected yet.`)
               }
             />
           ))}
@@ -404,8 +486,7 @@ export default function Home() {
           <div>
             <strong>AI Video Production</strong>
             <p>
-              Create, edit, review and prepare your next
-              YouTube Short.
+              Create, edit, review and prepare your next YouTube Short.
             </p>
           </div>
         </div>
@@ -421,23 +502,38 @@ export default function Home() {
               key={item.title}
               {...item}
               onClick={() =>
-                alert(`${item.title}: This module is not connected yet.`)
+                alert(`${item.title}: Production service is not connected yet.`)
               }
             />
           ))}
         </div>
 
-        <div className="approval-card">
-          <div className="approval-icon">✓</div>
-          <div>
-            <strong>Approval Center</strong>
-            <p>
-              Review scripts, assets and videos before
-              anything gets published.
-            </p>
-            <Status>0 Pending</Status>
+        <SectionTitle title="Approval Center" />
+
+        {dbApprovals.length === 0 ? (
+          <div className="empty-card">
+            <span>✓</span>
+            <strong>No approvals yet</strong>
+            <p>Items requiring your approval will appear here.</p>
           </div>
-        </div>
+        ) : (
+          <div className="activity-card">
+            {dbApprovals.map((item) => (
+              <div className="activity-item" key={item.id}>
+                <div className="activity-icon">📋</div>
+                <div className="activity-info">
+                  <strong>{item.action_type}</strong>
+                  <p>
+                    {item.created_at
+                      ? new Date(item.created_at).toLocaleString()
+                      : "Date unavailable"}
+                  </p>
+                </div>
+                <Status>{item.status || "Pending"}</Status>
+              </div>
+            ))}
+          </div>
+        )}
       </>
     );
   }
@@ -529,6 +625,19 @@ export default function Home() {
           </div>
         </div>
 
+        <SectionTitle title="Database Connection" />
+
+        <div className="settings-card database-status">
+          <div className="setting-row">
+            <div>
+              <strong>Supabase Database</strong>
+              <p>{dbLoading ? "Loading..." : dbError ? "Connection issue" : "Queries completed"}</p>
+            </div>
+            <Status>{dbError ? "Failed" : dbLoading ? "Running" : "Connected"}</Status>
+          </div>
+          {dbError && <p className="database-error">{dbError}</p>}
+        </div>
+
         <button
           className="logout-button"
           onClick={handleLogout}
@@ -537,7 +646,7 @@ export default function Home() {
           {loggingOut ? "Logging out..." : "↪  Logout"}
         </button>
 
-        <p className="version-text">CreatorOS · Version 1.0</p>
+        <p className="version-text">CreatorOS · Version 1.1</p>
       </>
     );
   }
@@ -552,6 +661,7 @@ export default function Home() {
             <span>AI YOUTUBE WORKSPACE</span>
           </div>
         </div>
+
         <div className="topbar-right">
           <span className="connection-dot" />
           <span className="connection-text">Account</span>
@@ -582,9 +692,7 @@ export default function Home() {
       </nav>
 
       <style jsx global>{`
-        * {
-          box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
           margin: 0;
@@ -593,15 +701,11 @@ export default function Home() {
           font-family: Arial, Helvetica, sans-serif;
         }
 
-        button {
-          font: inherit;
-        }
+        button { font: inherit; }
 
         .app-shell {
           min-height: 100dvh;
-          background:
-            radial-gradient(ellipse at 50% -15%, #142b49 0%, transparent 48%),
-            #080d15;
+          background: radial-gradient(ellipse at 50% -15%, #142b49 0%, transparent 48%), #080d15;
           padding-bottom: 100px;
         }
 
@@ -625,11 +729,7 @@ export default function Home() {
           border-radius: 14px;
         }
 
-        .loading-logo {
-          width: 58px;
-          height: 58px;
-          font-size: 28px;
-        }
+        .loading-logo { width: 58px; height: 58px; font-size: 28px; }
 
         .loading-spinner {
           width: 24px;
@@ -640,9 +740,7 @@ export default function Home() {
           animation: spin 0.8s linear infinite;
         }
 
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .topbar {
           height: 68px;
@@ -664,17 +762,8 @@ export default function Home() {
           gap: 10px;
         }
 
-        .brand-mark {
-          width: 38px;
-          height: 38px;
-          font-size: 21px;
-        }
-
-        .brand strong {
-          display: block;
-          font-size: 15px;
-        }
-
+        .brand-mark { width: 38px; height: 38px; font-size: 21px; }
+        .brand strong { display: block; font-size: 15px; }
         .brand span {
           display: block;
           color: #71839a;
@@ -683,18 +772,15 @@ export default function Home() {
           margin-top: 3px;
         }
 
-        .connection-dot, .pulse-dot {
+        .connection-dot {
           width: 7px;
           height: 7px;
           border-radius: 50%;
-          background: #e9aa48;
+          background: #48d7a0;
           display: inline-block;
         }
 
-        .connection-text {
-          color: #8798ad;
-          font-size: 11px;
-        }
+        .connection-text { color: #8798ad; font-size: 11px; }
 
         .top-avatar, .profile-icon, .account-avatar {
           display: grid;
@@ -706,11 +792,7 @@ export default function Home() {
           border-radius: 50%;
         }
 
-        .top-avatar {
-          width: 32px;
-          height: 32px;
-          font-size: 13px;
-        }
+        .top-avatar { width: 32px; height: 32px; font-size: 13px; }
 
         .main-content {
           max-width: 680px;
@@ -738,9 +820,7 @@ export default function Home() {
           letter-spacing: -1px;
         }
 
-        .welcome h1 span {
-          color: #398ff0;
-        }
+        .welcome h1 span { color: #398ff0; }
 
         .welcome p, .page-heading p {
           margin: 0;
@@ -749,11 +829,7 @@ export default function Home() {
           line-height: 1.6;
         }
 
-        .profile-icon {
-          width: 43px;
-          height: 43px;
-          font-size: 18px;
-        }
+        .profile-icon { width: 43px; height: 43px; font-size: 18px; }
 
         .hero-card {
           position: relative;
@@ -778,11 +854,7 @@ export default function Home() {
           opacity: 0.3;
         }
 
-        .hero-content {
-          position: relative;
-          z-index: 1;
-          max-width: 78%;
-        }
+        .hero-content { position: relative; z-index: 1; max-width: 78%; }
 
         .agent-label {
           color: #80c2ff;
@@ -795,22 +867,15 @@ export default function Home() {
         }
 
         .pulse-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
           background: #48d7a0;
           box-shadow: 0 0 10px #48d7a0;
         }
 
-        .hero-card h2 {
-          font-size: 21px;
-          line-height: 1.3;
-          margin: 15px 0 8px;
-        }
-
-        .hero-card p {
-          color: #a7bad1;
-          font-size: 11px;
-          line-height: 1.65;
-          margin: 0 0 15px;
-        }
+        .hero-card h2 { font-size: 21px; line-height: 1.3; margin: 15px 0 8px; }
+        .hero-card p { color: #a7bad1; font-size: 11px; line-height: 1.65; margin: 0 0 15px; }
 
         .robot-art {
           position: absolute;
@@ -832,9 +897,7 @@ export default function Home() {
           cursor: pointer;
         }
 
-        .primary-button span {
-          margin-left: 12px;
-        }
+        .primary-button span { margin-left: 12px; }
 
         .section-title {
           display: flex;
@@ -843,21 +906,9 @@ export default function Home() {
           margin: 26px 0 13px;
         }
 
-        .section-title h2 {
-          font-size: 15px;
-          margin: 0;
-        }
-
-        .section-title p {
-          color: #77899f;
-          font-size: 10px;
-          margin: 5px 0 0;
-        }
-
-        .section-action {
-          color: #58aaff;
-          font-size: 10px;
-        }
+        .section-title h2 { font-size: 15px; margin: 0; }
+        .section-title p { color: #77899f; font-size: 10px; margin: 5px 0 0; }
+        .section-action { color: #58aaff; font-size: 10px; }
 
         .stats-grid {
           display: grid;
@@ -866,42 +917,20 @@ export default function Home() {
         }
 
         .stat-card, .activity-card, .settings-card,
-        .account-card, .protection-card, .approval-card {
+        .account-card, .protection-card, .approval-card,
+        .empty-card {
           background: #0e1724;
           border: 1px solid #1c2b3f;
           border-radius: 13px;
         }
 
-        .stat-card {
-          min-height: 104px;
-          padding: 13px;
-        }
+        .stat-card { min-height: 104px; padding: 13px; }
+        .stat-icon { display: block; font-size: 15px; margin-bottom: 7px; }
+        .stat-card strong { display: block; font-size: 22px; }
+        .stat-card .small-stat { font-size: 15px; margin-top: 5px; }
+        .stat-card p { color: #7f90a5; font-size: 10px; margin: 5px 0 0; }
 
-        .stat-icon {
-          display: block;
-          font-size: 15px;
-          margin-bottom: 7px;
-        }
-
-        .stat-card strong {
-          display: block;
-          font-size: 22px;
-        }
-
-        .stat-card .small-stat {
-          font-size: 15px;
-          margin-top: 5px;
-        }
-
-        .stat-card p {
-          color: #7f90a5;
-          font-size: 10px;
-          margin: 5px 0 0;
-        }
-
-        .activity-card {
-          padding: 0 13px;
-        }
+        .activity-card { padding: 0 13px; }
 
         .activity-item {
           display: flex;
@@ -911,9 +940,7 @@ export default function Home() {
           border-bottom: 1px solid #1b293a;
         }
 
-        .activity-item:last-child {
-          border-bottom: 0;
-        }
+        .activity-item:last-child { border-bottom: 0; }
 
         .activity-icon, .module-icon {
           display: grid;
@@ -924,31 +951,16 @@ export default function Home() {
           flex-shrink: 0;
         }
 
-        .activity-icon {
-          width: 35px;
-          height: 35px;
-          font-size: 15px;
-        }
-
-        .activity-info {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .activity-info strong {
-          font-size: 11px;
-        }
-
+        .activity-icon { width: 35px; height: 35px; font-size: 15px; }
+        .activity-info { flex: 1; min-width: 0; }
+        .activity-info strong { font-size: 11px; }
         .activity-info p {
           color: #8b9bb0;
           font-size: 9px;
           margin: 4px 0;
+          overflow-wrap: anywhere;
         }
-
-        .activity-info > span {
-          color: #61758e;
-          font-size: 8px;
-        }
+        .activity-info > span { color: #61758e; font-size: 8px; }
 
         .status {
           display: inline-block;
@@ -961,20 +973,10 @@ export default function Home() {
           color: #a5b4c8;
         }
 
-        .status.success {
-          background: #123629;
-          color: #5cdaa1;
-        }
-
-        .status.running {
-          background: #173658;
-          color: #75baff;
-        }
-
-        .status.waiting {
-          background: #292b32;
-          color: #a8aab4;
-        }
+        .status.success { background: #123629; color: #5cdaa1; }
+        .status.running { background: #173658; color: #75baff; }
+        .status.waiting { background: #292b32; color: #a8aab4; }
+        .status.danger { background: #3a1b25; color: #ff929d; }
 
         .notice-card {
           display: flex;
@@ -986,14 +988,8 @@ export default function Home() {
           background: #111b2b;
         }
 
-        .notice-card > span {
-          font-size: 18px;
-        }
-
-        .notice-card strong {
-          font-size: 11px;
-        }
-
+        .notice-card > span { font-size: 18px; }
+        .notice-card strong { font-size: 11px; }
         .notice-card p {
           color: #8e9eb3;
           font-size: 10px;
@@ -1001,15 +997,32 @@ export default function Home() {
           margin: 5px 0 0;
         }
 
-        .page-heading {
-          margin: 5px 0 22px;
+        .database-message { color: #69b5ff; font-size: 11px; margin: 12px 0; }
+
+        .database-error {
+          color: #ff929d;
+          background: #29161d;
+          border: 1px solid #713b45;
+          border-radius: 10px;
+          padding: 12px;
+          font-size: 11px;
+          overflow-wrap: anywhere;
+          margin: 12px 0;
         }
 
-        .page-heading h1 {
-          font-size: 28px;
-          margin: 7px 0;
-          letter-spacing: -0.7px;
+        .database-error p { margin-bottom: 0; line-height: 1.5; }
+
+        .empty-card {
+          padding: 19px;
+          text-align: center;
         }
+
+        .empty-card > span { display: block; font-size: 24px; margin-bottom: 9px; }
+        .empty-card strong { font-size: 11px; }
+        .empty-card p { color: #8293a9; font-size: 10px; line-height: 1.5; margin: 6px 0 0; }
+
+        .page-heading { margin: 5px 0 22px; }
+        .page-heading h1 { font-size: 28px; margin: 7px 0; letter-spacing: -0.7px; }
 
         .intelligence-banner, .production-banner {
           display: flex;
@@ -1022,14 +1035,8 @@ export default function Home() {
           margin-bottom: 24px;
         }
 
-        .banner-icon, .production-banner-icon {
-          font-size: 27px;
-        }
-
-        .intelligence-banner strong, .production-banner strong {
-          font-size: 12px;
-        }
-
+        .banner-icon, .production-banner-icon { font-size: 27px; }
+        .intelligence-banner strong, .production-banner strong { font-size: 12px; }
         .intelligence-banner p, .production-banner p {
           color: #9aacc2;
           font-size: 10px;
@@ -1055,10 +1062,7 @@ export default function Home() {
           cursor: pointer;
         }
 
-        .module-card:active {
-          border-color: #348fe8;
-          transform: scale(0.99);
-        }
+        .module-card:active { border-color: #348fe8; transform: scale(0.99); }
 
         .module-top {
           display: flex;
@@ -1067,32 +1071,10 @@ export default function Home() {
           gap: 4px;
         }
 
-        .module-icon {
-          width: 35px;
-          height: 35px;
-          font-size: 17px;
-        }
-
-        .module-card h3 {
-          font-size: 11px;
-          margin: 13px 0 6px;
-        }
-
-        .module-card p {
-          min-height: 29px;
-          color: #8495aa;
-          font-size: 9px;
-          line-height: 1.5;
-          margin: 0;
-        }
-
-        .module-arrow {
-          display: flex;
-          justify-content: space-between;
-          color: #55a8ff;
-          font-size: 9px;
-          margin-top: 12px;
-        }
+        .module-icon { width: 35px; height: 35px; font-size: 17px; }
+        .module-card h3 { font-size: 11px; margin: 13px 0 6px; }
+        .module-card p { min-height: 29px; color: #8495aa; font-size: 9px; line-height: 1.5; margin: 0; }
+        .module-arrow { display: flex; justify-content: space-between; color: #55a8ff; font-size: 9px; margin-top: 12px; }
 
         .protection-card, .approval-card {
           display: flex;
@@ -1112,76 +1094,20 @@ export default function Home() {
           font-size: 19px;
         }
 
-        .protection-card strong, .approval-card strong {
-          font-size: 11px;
-        }
+        .protection-card strong, .approval-card strong { font-size: 11px; }
+        .protection-card p, .approval-card p { color: #899bb1; font-size: 9px; margin: 5px 0 8px; }
 
-        .protection-card p, .approval-card p {
-          color: #899bb1;
-          font-size: 9px;
-          margin: 5px 0 8px;
-        }
+        .account-card { display: flex; align-items: center; gap: 13px; padding: 16px; }
+        .account-avatar { width: 43px; height: 43px; font-size: 18px; }
+        .account-info { min-width: 0; }
+        .account-info strong { font-size: 11px; overflow-wrap: anywhere; }
+        .account-info p { color: #8395ab; font-size: 9px; margin: 5px 0 8px; }
 
-        .approval-icon {
-          color: #5cdaa1;
-          font-size: 20px;
-        }
-
-        .account-card {
-          display: flex;
-          align-items: center;
-          gap: 13px;
-          padding: 16px;
-        }
-
-        .account-avatar {
-          width: 43px;
-          height: 43px;
-          font-size: 18px;
-        }
-
-        .account-info {
-          min-width: 0;
-        }
-
-        .account-info strong {
-          font-size: 11px;
-          overflow-wrap: anywhere;
-        }
-
-        .account-info p {
-          color: #8395ab;
-          font-size: 9px;
-          margin: 5px 0 8px;
-        }
-
-        .settings-card {
-          padding: 0 14px;
-        }
-
-        .setting-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 15px 0;
-        }
-
-        .setting-row strong, .simple-setting strong {
-          font-size: 11px;
-        }
-
-        .setting-row p, .simple-setting p {
-          color: #8596aa;
-          font-size: 9px;
-          line-height: 1.5;
-          margin: 5px 0 0;
-        }
-
-        .setting-divider {
-          height: 1px;
-          background: #1e2c3e;
-        }
+        .settings-card { padding: 0 14px; }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 0; }
+        .setting-row strong, .simple-setting strong { font-size: 11px; }
+        .setting-row p, .simple-setting p { color: #8596aa; font-size: 9px; line-height: 1.5; margin: 5px 0 0; }
+        .setting-divider { height: 1px; background: #1e2c3e; }
 
         .toggle {
           width: 42px;
@@ -1203,24 +1129,10 @@ export default function Home() {
           transition: transform 0.2s;
         }
 
-        .toggle.active {
-          background: #247ee0;
-        }
-
-        .toggle.active span {
-          transform: translateX(18px);
-        }
-
-        .simple-setting {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 0;
-        }
-
-        .simple-setting > span {
-          font-size: 18px;
-        }
+        .toggle.active { background: #247ee0; }
+        .toggle.active span { transform: translateX(18px); }
+        .simple-setting { display: flex; align-items: center; gap: 12px; padding: 14px 0; }
+        .simple-setting > span { font-size: 18px; }
 
         .logout-button {
           width: 100%;
@@ -1235,16 +1147,8 @@ export default function Home() {
           cursor: pointer;
         }
 
-        .logout-button:disabled {
-          opacity: 0.5;
-        }
-
-        .version-text {
-          color: #53657b;
-          text-align: center;
-          font-size: 9px;
-          margin: 18px 0 0;
-        }
+        .logout-button:disabled { opacity: 0.5; }
+        .version-text { color: #53657b; text-align: center; font-size: 9px; margin: 18px 0 0; }
 
         .bottom-nav {
           position: fixed;
@@ -1274,31 +1178,14 @@ export default function Home() {
           cursor: pointer;
         }
 
-        .nav-icon {
-          font-size: 20px;
-          line-height: 1;
-        }
-
-        .nav-item.selected {
-          color: #5aabff;
-        }
-
-        .nav-item.selected .nav-icon {
-          text-shadow: 0 0 15px #2789ef;
-        }
+        .nav-icon { font-size: 20px; line-height: 1; }
+        .nav-item.selected { color: #5aabff; }
+        .nav-item.selected .nav-icon { text-shadow: 0 0 15px #2789ef; }
 
         @media (min-width: 600px) {
-          .main-content {
-            padding-top: 30px;
-          }
-
-          .stats-grid {
-            grid-template-columns: repeat(4, 1fr);
-          }
-
-          .module-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-          }
+          .main-content { padding-top: 30px; }
+          .stats-grid { grid-template-columns: repeat(4, 1fr); }
+          .module-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
       `}</style>
     </main>
