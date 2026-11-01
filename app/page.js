@@ -3,318 +3,653 @@
 
 import { useState } from "react";
 
-const nav = [
-  ["Overview", "◫"],
-  ["Analytics", "▥"],
-  ["AI Agent", "✳"],
-  ["Video Ideas", "✦"],
-  ["Scripts", "▤"],
-  ["Assets", "▧"],
-  ["Voice Studio", "♫"],
-  ["AI Editor", "✂"],
-  ["Preview", "▷"],
-  ["Publishing", "↑"],
+const sections = {
+  Home: ["Overview", "Your AI workspace at a glance"],
+  Intelligence: ["AI Intelligence Center", "Monitor, analyze and improve your channel"],
+  Production: ["Video Production", "Create your next YouTube Short"],
+  More: ["More Tools", "Manage your AI workspace"],
+};
+
+const intelligence = [
+  ["◉", "Channel Monitor", "Detect channel issues and important changes"],
+  ["▥", "Video Doctor", "Find why videos underperform"],
+  ["✦", "Trend Intelligence", "Discover trending topics and opportunities"],
+  ["⌕", "SEO Intelligence", "Audit titles, descriptions and tags"],
+  ["♙", "Audience Insights", "Understand retention and viewer behavior"],
+  ["☏", "Comment Center", "Monitor comments and prepare replies"],
+  ["◎", "Competitor Watch", "Study similar channels and their content"],
+  ["↗", "Growth Intelligence", "Find opportunities to improve your channel"],
 ];
 
-const workflow = [
-  ["01", "Research & Ideas", "Find topics from trends and channel data", "Waiting"],
-  ["02", "Script Generation", "Create a story and engaging hook", "Waiting"],
-  ["03", "Asset Collection", "Gather images, clips and visual elements", "Waiting"],
-  ["04", "Voice Generation", "Generate narration from approved script", "Waiting"],
-  ["05", "AI Editing", "Choose style, captions, zooms and sound effects", "Waiting"],
-  ["06", "Final Review", "Preview and approve the finished video", "Approval"],
-  ["07", "Publishing", "Upload and publish to YouTube", "Waiting"],
+const production = [
+  ["✦", "Video Ideas", "Discover topics for your next Short"],
+  ["▤", "Script Studio", "Write engaging video scripts"],
+  ["▧", "Asset Manager", "Organize images, clips and visual assets"],
+  ["♫", "Voice Studio", "Generate narration"],
+  ["✂", "AI Video Editor", "Create and edit your video"],
+  ["▷", "Video Preview", "Review your finished video"],
+  ["↑", "Publishing", "Prepare and publish approved videos"],
+];
+
+const activities = [
+  ["Channel Analysis", "Check recent video performance", "Waiting"],
+  ["Trend Research", "Find relevant USA mystery topics", "Waiting"],
+  ["Video Diagnosis", "Analyze retention and engagement", "Waiting"],
+  ["SEO Audit", "Review titles and descriptions", "Waiting"],
 ];
 
 export default function Home() {
-  const [active, setActive] = useState("Overview");
+  const [tab, setTab] = useState("Home");
+  const [page, setPage] = useState("");
+  const [auto, setAuto] = useState(true);
+
+  const openPage = (name) => {
+    setPage(name);
+  };
+
+  const backHome = () => setPage("");
+
+  const Card = ({ icon, title, desc, onClick }) => (
+    <button className="tool-card" onClick={onClick}>
+      <span className="tool-icon">{icon}</span>
+      <span className="tool-title">{title}</span>
+      <span className="tool-desc">{desc}</span>
+      <span className="tool-arrow">›</span>
+    </button>
+  );
 
   return (
-    <main className="shell">
+    <main className="app">
       <style jsx global>{`
         * { box-sizing: border-box; }
-        body {
+        html, body {
           margin: 0;
-          background: #080d14;
-          color: #edf3fc;
+          padding: 0;
+          background: #080d15;
+          color: #edf4ff;
           font-family: Arial, Helvetica, sans-serif;
         }
         button { font: inherit; }
-        .shell { min-height: 100vh; display: flex; }
-        .sidebar {
-          width: 248px; flex-shrink: 0; background: #0c131e;
-          border-right: 1px solid #1d2a3a; padding: 24px 15px;
-          display: flex; flex-direction: column;
+        .app {
+          width: 100%;
+          max-width: 520px;
+          min-height: 100dvh;
+          margin: auto;
+          padding-bottom: 88px;
+          background: #080d15;
         }
-        .brand { font-size: 19px; font-weight: 800; padding: 4px 10px; }
-        .brand b { color: #3995ff; }
-        .brand-sub { color: #72849a; font-size: 10px; letter-spacing: 1.5px;
-          padding: 5px 10px 30px; }
-        .nav-label { color: #63758b; font-size: 10px; letter-spacing: 1.4px;
-          padding: 0 10px 10px; }
-        .nav-btn {
-          display: flex; align-items: center; gap: 12px; width: 100%;
-          padding: 11px 12px; border: 0; border-radius: 8px;
-          color: #9aabc0; background: transparent; text-align: left;
-          font-size: 13px; margin-bottom: 3px; cursor: pointer;
+        .header {
+          padding: 20px 19px 15px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid #1a293a;
+          background: #0c1420;
         }
-        .nav-btn:hover { background: #152236; color: #fff; }
-        .nav-btn.active {
-          color: #70b5ff; background: #142b46;
-          box-shadow: inset 2px 0 #3995ff;
+        .brand {
+          font-size: 20px;
+          font-weight: 800;
+          letter-spacing: -.6px;
         }
-        .nav-icon { width: 20px; font-size: 16px; text-align: center; }
-        .side-bottom { margin-top: auto; border-top: 1px solid #1d2a3a;
-          padding: 18px 9px 0; }
-        .user-row { display: flex; gap: 10px; align-items: center; }
-        .avatar { width: 34px; height: 34px; border-radius: 10px;
-          background: #173c65; color: #8fc5ff; display: grid;
-          place-items: center; font-weight: bold; }
-        .user-name { font-size: 12px; font-weight: bold; }
-        .user-sub { font-size: 10px; color: #71839a; margin-top: 4px; }
-        .main { flex: 1; min-width: 0; padding: 27px 30px 45px; }
-        .topbar { display: flex; justify-content: space-between;
-          align-items: center; gap: 15px; margin-bottom: 27px; }
-        h1 { margin: 0; font-size: 25px; letter-spacing: -.5px; }
-        .subtitle { color: #8292a7; font-size: 12px; margin-top: 7px; }
-        .top-actions { display: flex; gap: 10px; align-items: center; }
-        .connection { color: #f0c36b; background: #292318;
-          border: 1px solid #554323; border-radius: 20px;
-          padding: 8px 12px; font-size: 11px; }
-        .icon-btn { width: 36px; height: 36px; border: 1px solid #26364a;
-          color: #b5c5d8; background: #101b2a; border-radius: 9px; }
-        .welcome {
-          background: linear-gradient(110deg, #102746, #102035 65%, #111b2b);
-          border: 1px solid #23476c; border-radius: 14px;
-          padding: 22px 23px; margin-bottom: 20px;
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 15px; overflow: hidden;
+        .brand span { color: #399aff; }
+        .brand-sub {
+          font-size: 9px;
+          color: #71869f;
+          letter-spacing: 1.5px;
+          margin-top: 4px;
         }
-        .welcome h2 { font-size: 18px; margin: 0 0 8px; }
-        .welcome p { color: #9db5d0; font-size: 12px; margin: 0; line-height: 1.6; }
-        .primary {
-          background: #2788ed; border: 0; border-radius: 8px;
-          color: white; padding: 11px 15px; font-size: 12px;
-          font-weight: bold; cursor: pointer; white-space: nowrap;
+        .header-right {
+          display: flex;
+          align-items: center;
+          gap: 9px;
         }
-        .primary:hover { background: #409aff; }
-        .stats { display: grid; grid-template-columns: repeat(4, 1fr);
-          gap: 13px; margin-bottom: 22px; }
-        .card { background: #101a28; border: 1px solid #202f42;
-          border-radius: 12px; padding: 17px; min-width: 0; }
-        .stat-top { display: flex; justify-content: space-between;
-          align-items: center; color: #94a5ba; font-size: 11px; }
-        .stat-icon { color: #6bb3ff; background: #162d49;
-          border-radius: 8px; width: 30px; height: 30px;
-          display: grid; place-items: center; font-size: 15px; }
-        .stat-value { font-size: 24px; font-weight: 750; margin-top: 13px; }
-        .stat-note { color: #71849a; font-size: 10px; margin-top: 5px; }
-        .section-head { display: flex; justify-content: space-between;
-          align-items: center; margin: 25px 0 13px; gap: 10px; }
-        .section-head h2 { font-size: 15px; margin: 0; }
-        .small-link { color: #69adfa; font-size: 11px; background: none;
-          border: 0; cursor: pointer; }
-        .content-grid { display: grid; grid-template-columns: 1.45fr 1fr;
-          gap: 14px; }
-        .panel { background: #101a28; border: 1px solid #202f42;
-          border-radius: 12px; padding: 18px; min-width: 0; }
-        .panel-title { font-size: 13px; font-weight: bold; margin: 0 0 5px; }
-        .panel-sub { color: #71849a; font-size: 10px; }
-        .empty-chart { height: 155px; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; color: #71849a;
-          font-size: 11px; gap: 8px; text-align: center; }
-        .chart-icon { font-size: 25px; color: #438fda; }
-        .agent-status { display: flex; gap: 11px; align-items: center;
-          padding: 13px; border-radius: 9px; background: #14243a;
-          margin-top: 15px; }
-        .pulse { width: 9px; height: 9px; background: #e9b95c;
-          border-radius: 50%; }
-        .agent-text { font-size: 12px; font-weight: bold; }
-        .agent-sub { color: #8497ad; font-size: 10px; margin-top: 4px; }
-        .workflow { margin-top: 15px; }
-        .workflow-row { display: flex; align-items: center; gap: 12px;
-          padding: 13px 0; border-bottom: 1px solid #1e2c3d; }
-        .workflow-row:last-child { border: 0; }
-        .step-no { width: 29px; height: 29px; display: grid;
-          place-items: center; border: 1px solid #2b4058;
-          border-radius: 8px; color: #83bfff; font-size: 10px; }
-        .step-info { flex: 1; min-width: 0; }
-        .step-title { font-size: 11px; font-weight: bold; }
-        .step-desc { color: #7d90a7; font-size: 10px; margin-top: 4px; }
-        .step-status { font-size: 9px; color: #91a3b8;
-          background: #1b2939; border-radius: 5px; padding: 5px 7px; }
-        .approval { color: #f1c36d; background: #332a19; }
-        .mobile-nav { display: none; }
-        .page-panel { background: #101a28; border: 1px solid #202f42;
-          border-radius: 12px; padding: 22px; min-height: 250px; }
-        .page-panel p { color: #8292a7; font-size: 12px; line-height: 1.7; }
-        @media(max-width: 1000px) {
-          .sidebar { width: 210px; }
-          .main { padding: 23px 20px; }
-          .stats { grid-template-columns: repeat(2, 1fr); }
-          .content-grid { grid-template-columns: 1fr; }
+        .connection {
+          font-size: 9px;
+          color: #f0c36d;
+          border: 1px solid #554426;
+          background: #2b2418;
+          padding: 7px 9px;
+          border-radius: 20px;
         }
-        @media(max-width: 650px) {
-          .shell { display: block; padding-bottom: 68px; }
-          .sidebar { display: none; }
-          .main { padding: 20px 14px; }
-          .topbar { align-items: flex-start; }
-          h1 { font-size: 21px; }
-          .connection { font-size: 9px; padding: 7px 8px; }
-          .icon-btn { display: none; }
-          .welcome { padding: 17px; align-items: flex-start; flex-direction: column; }
-          .welcome h2 { font-size: 16px; }
-          .stats { gap: 9px; }
-          .card { padding: 13px; }
-          .stat-value { font-size: 21px; }
-          .panel { padding: 14px; }
-          .mobile-nav {
-            display: flex; position: fixed; z-index: 10; bottom: 0;
-            left: 0; right: 0; overflow-x: auto; gap: 4px;
-            background: #0c131e; border-top: 1px solid #26364a;
-            padding: 8px 7px max(8px, env(safe-area-inset-bottom));
-          }
-          .mobile-nav button {
-            flex: 0 0 auto; min-width: 57px; border: 0;
-            color: #91a3b8; background: transparent; border-radius: 8px;
-            padding: 7px 8px; font-size: 9px;
-          }
-          .mobile-nav button.active { color: #77baff; background: #172d47; }
-          .mobile-nav span { display: block; font-size: 16px; margin-bottom: 4px; }
+        .avatar {
+          width: 33px;
+          height: 33px;
+          display: grid;
+          place-items: center;
+          border-radius: 10px;
+          background: #173b65;
+          color: #9dccff;
+          font-weight: 800;
+        }
+        .content { padding: 19px 16px 25px; }
+        .page-heading {
+          font-size: 22px;
+          font-weight: 750;
+          letter-spacing: -.5px;
+          margin: 0;
+        }
+        .page-sub {
+          color: #8294aa;
+          font-size: 11px;
+          line-height: 1.6;
+          margin-top: 6px;
+        }
+        .hero {
+          margin-top: 18px;
+          border: 1px solid #24558a;
+          border-radius: 15px;
+          padding: 19px;
+          background: linear-gradient(135deg,#12345a,#101d31 75%);
+        }
+        .hero-label {
+          font-size: 9px;
+          color: #91c5ff;
+          letter-spacing: 1.4px;
+          font-weight: bold;
+        }
+        .hero-title {
+          font-size: 19px;
+          line-height: 1.35;
+          font-weight: 750;
+          margin-top: 10px;
+        }
+        .hero-text {
+          color: #a4bad3;
+          font-size: 11px;
+          line-height: 1.7;
+          margin-top: 8px;
+        }
+        .button-primary {
+          border: 0;
+          border-radius: 8px;
+          background: #2789ef;
+          color: white;
+          font-size: 11px;
+          font-weight: bold;
+          padding: 11px 14px;
+          margin-top: 15px;
+        }
+        .section-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 23px 0 12px;
+        }
+        .section-title {
+          font-size: 14px;
+          font-weight: 750;
+        }
+        .section-note {
+          color: #71849a;
+          font-size: 9px;
+        }
+        .status-card {
+          border: 1px solid #24364c;
+          border-radius: 13px;
+          padding: 15px;
+          background: #101a29;
+        }
+        .status-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .status-name {
+          font-size: 12px;
+          font-weight: bold;
+        }
+        .status-pill {
+          color: #f0c36d;
+          background: #302719;
+          padding: 6px 8px;
+          border-radius: 6px;
+          font-size: 9px;
+        }
+        .status-desc {
+          font-size: 10px;
+          color: #8193aa;
+          margin-top: 7px;
+          line-height: 1.6;
+        }
+        .stat-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-top: 11px;
+        }
+        .stat {
+          padding: 14px;
+          border: 1px solid #223349;
+          border-radius: 11px;
+          background: #101a29;
+        }
+        .stat-label {
+          font-size: 10px;
+          color: #91a2b7;
+        }
+        .stat-value {
+          font-size: 20px;
+          font-weight: 750;
+          margin-top: 10px;
+        }
+        .stat-sub {
+          font-size: 9px;
+          color: #71849a;
+          margin-top: 5px;
+        }
+        .blue { color: #69b3ff; }
+        .tool-list {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .tool-card {
+          min-width: 0;
+          position: relative;
+          text-align: left;
+          padding: 14px 12px;
+          background: #101a29;
+          border: 1px solid #24364c;
+          border-radius: 12px;
+          color: #edf4ff;
+          min-height: 126px;
+        }
+        .tool-card:active { background: #172943; }
+        .tool-icon {
+          display: grid;
+          place-items: center;
+          width: 31px;
+          height: 31px;
+          border-radius: 9px;
+          color: #7bbcff;
+          background: #183452;
+          font-size: 16px;
+          margin-bottom: 12px;
+        }
+        .tool-title {
+          display: block;
+          font-size: 11px;
+          font-weight: 750;
+          padding-right: 8px;
+        }
+        .tool-desc {
+          display: block;
+          color: #8294aa;
+          font-size: 9px;
+          line-height: 1.6;
+          margin-top: 6px;
+        }
+        .tool-arrow {
+          position: absolute;
+          right: 11px;
+          top: 16px;
+          color: #6483a4;
+          font-size: 18px;
+        }
+        .activity-item {
+          display: flex;
+          gap: 11px;
+          padding: 13px 0;
+          border-bottom: 1px solid #1e2d40;
+        }
+        .activity-item:last-child { border: 0; }
+        .activity-dot {
+          width: 9px;
+          height: 9px;
+          margin-top: 4px;
+          border-radius: 50%;
+          background: #4b9fff;
+          flex-shrink: 0;
+        }
+        .activity-name { font-size: 11px; font-weight: bold; }
+        .activity-desc {
+          font-size: 9px;
+          color: #8193aa;
+          margin-top: 5px;
+          line-height: 1.5;
+        }
+        .activity-status {
+          margin-left: auto;
+          color: #f0c36d;
+          font-size: 9px;
+          white-space: nowrap;
+        }
+        .notice {
+          padding: 13px;
+          border-radius: 10px;
+          border: 1px solid #34445b;
+          background: #141f30;
+          color: #9aadc4;
+          font-size: 10px;
+          line-height: 1.7;
+          margin-top: 15px;
+        }
+        .back {
+          background: none;
+          border: 0;
+          color: #75baff;
+          font-size: 11px;
+          padding: 0;
+          margin-bottom: 18px;
+        }
+        .detail-panel {
+          background: #101a29;
+          border: 1px solid #24364c;
+          border-radius: 13px;
+          padding: 17px;
+          margin-top: 17px;
+        }
+        .detail-panel h3 {
+          font-size: 14px;
+          margin: 0 0 9px;
+        }
+        .detail-panel p {
+          color: #8ea0b5;
+          font-size: 11px;
+          line-height: 1.8;
+        }
+        .setting-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 0;
+          border-bottom: 1px solid #24364c;
+        }
+        .setting-row:last-child { border: 0; }
+        .setting-name { font-size: 11px; font-weight: bold; }
+        .setting-desc {
+          color: #8294aa;
+          font-size: 9px;
+          margin-top: 5px;
+        }
+        .toggle {
+          border: 0;
+          width: 39px;
+          height: 22px;
+          border-radius: 20px;
+          background: #35465c;
+          padding: 3px;
+          flex-shrink: 0;
+        }
+        .toggle.on { background: #247fe0; }
+        .toggle-dot {
+          display: block;
+          width: 16px;
+          height: 16px;
+          background: white;
+          border-radius: 50%;
+          transition: transform .15s;
+        }
+        .toggle.on .toggle-dot { transform: translateX(17px); }
+        .bottom-nav {
+          position: fixed;
+          bottom: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 100%;
+          max-width: 520px;
+          display: grid;
+          grid-template-columns: repeat(4,1fr);
+          padding: 9px 5px max(9px,env(safe-area-inset-bottom));
+          background: #0c1420;
+          border-top: 1px solid #24364c;
+          z-index: 20;
+        }
+        .bottom-nav button {
+          border: 0;
+          background: none;
+          color: #788da7;
+          font-size: 9px;
+          padding: 5px 2px;
+        }
+        .bottom-nav button.active { color: #72baff; }
+        .bottom-icon {
+          display: block;
+          font-size: 19px;
+          margin-bottom: 5px;
+        }
+        @media(min-width: 700px) {
+          .app { border-left: 1px solid #1b2a3b; border-right: 1px solid #1b2a3b; }
         }
       `}</style>
 
-      <aside className="sidebar">
-        <div className="brand">◈ <b>Creator</b>OS</div>
-        <div className="brand-sub">AI YOUTUBE WORKSPACE</div>
-        <div className="nav-label">WORKSPACE</div>
-        {nav.map(([name, icon]) => (
-          <button key={name}
-            className={`nav-btn ${active === name ? "active" : ""}`}
-            onClick={() => setActive(name)}>
-            <span className="nav-icon">{icon}</span>{name}
-          </button>
-        ))}
-        <div className="side-bottom">
-          <div className="user-row">
-            <div className="avatar">S</div>
-            <div>
-              <div className="user-name">My Workspace</div>
-              <div className="user-sub">Channel not connected</div>
-            </div>
-          </div>
+      <header className="header">
+        <div>
+          <div className="brand">◈ Creator<span>OS</span></div>
+          <div className="brand-sub">AI YOUTUBE WORKSPACE</div>
         </div>
-      </aside>
+        <div className="header-right">
+          <div className="connection">● Not connected</div>
+          <div className="avatar">S</div>
+        </div>
+      </header>
 
-      <section className="main">
-        <header className="topbar">
-          <div>
-            <h1>{active}</h1>
-            <div className="subtitle">Manage your YouTube channel with AI</div>
-          </div>
-          <div className="top-actions">
-            <div className="connection">● YouTube not connected</div>
-            <button className="icon-btn" title="Notifications">♧</button>
-          </div>
-        </header>
-
-        <nav className="mobile-nav">
-          {nav.map(([name, icon]) => (
-            <button key={name}
-              className={active === name ? "active" : ""}
-              onClick={() => setActive(name)}>
-              <span>{icon}</span>{name}
-            </button>
-          ))}
-        </nav>
-
-        {active === "Overview" ? (
+      <div className="content">
+        {page ? (
           <>
-            <div className="welcome">
-              <div>
-                <h2>Your AI content studio is ready to set up.</h2>
-                <p>Connect your channel later. First, let's build your production workflow.</p>
-              </div>
-              <button className="primary" onClick={() => setActive("AI Agent")}>
-                Explore AI Agent →
-              </button>
-            </div>
-
-            <div className="stats">
-              {[
-                ["Total Views", "—", "Connect YouTube to view data", "◉"],
-                ["Subscribers", "—", "Channel analytics unavailable", "♙"],
-                ["Published Videos", "—", "Waiting for channel data", "▷"],
-                ["Agent Status", "Setup", "Integrations not connected", "✳"],
-              ].map(([label, value, note, icon]) => (
-                <div className="card" key={label}>
-                  <div className="stat-top">
-                    {label}<span className="stat-icon">{icon}</span>
-                  </div>
-                  <div className="stat-value">{value}</div>
-                  <div className="stat-note">{note}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="content-grid">
-              <div className="panel">
-                <div className="panel-title">Channel Performance</div>
-                <div className="panel-sub">Your views and audience growth</div>
-                <div className="empty-chart">
-                  <div className="chart-icon">▥</div>
-                  <strong>No channel data yet</strong>
-                  Connect your YouTube channel to see real analytics here.
-                </div>
-              </div>
-              <div className="panel">
-                <div className="panel-title">AI Agent Control Center</div>
-                <div className="panel-sub">Your automated production assistant</div>
-                <div className="agent-status">
-                  <span className="pulse"></span>
-                  <div>
-                    <div className="agent-text">Agent setup pending</div>
-                    <div className="agent-sub">Waiting for integrations</div>
-                  </div>
-                </div>
-                <div className="workflow">
-                  <div className="step-title">Next: Configure the workflow</div>
-                  <div className="step-desc">We'll connect the AI services and channel access in later steps.</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="section-head">
-              <h2>Video Production Pipeline</h2>
-              <button className="small-link" onClick={() => setActive("AI Agent")}>View workflow →</button>
-            </div>
-            <div className="panel">
-              {workflow.map(([no, title, desc, status]) => (
-                <div className="workflow-row" key={no}>
-                  <div className="step-no">{no}</div>
-                  <div className="step-info">
-                    <div className="step-title">{title}</div>
-                    <div className="step-desc">{desc}</div>
-                  </div>
-                  <span className={`step-status ${status === "Approval" ? "approval" : ""}`}>
-                    {status}
-                  </span>
-                </div>
-              ))}
+            <button className="back" onClick={backHome}>← Back</button>
+            <h1 className="page-heading">{page}</h1>
+            <div className="page-sub">Your AI workspace module</div>
+            <div className="detail-panel">
+              <h3>{page}</h3>
+              <p>
+                This module is included in the planned CreatorOS workflow.
+                Its real integrations and automation will be implemented
+                in the next development stages.
+              </p>
+              <span className="status-pill">UNDER DEVELOPMENT</span>
             </div>
           </>
         ) : (
-          <div className="page-panel">
-            <h2>{active}</h2>
-            <p>
-              This workspace section is ready for its implementation.
-              Its real AI services and YouTube integrations will be connected
-              in the next development steps.
-            </p>
-            <span className="step-status">UNDER DEVELOPMENT</span>
-          </div>
+          <>
+            <h1 className="page-heading">{sections[tab][0]}</h1>
+            <div className="page-sub">{sections[tab][1]}</div>
+
+            {tab === "Home" && (
+              <>
+                <div className="hero">
+                  <div className="hero-label">YOUR AUTONOMOUS AI WORKSPACE</div>
+                  <div className="hero-title">
+                    Your channel. Your AI. Your control.
+                  </div>
+                  <div className="hero-text">
+                    Monitor your channel, discover opportunities and
+                    manage your entire Shorts production workflow.
+                  </div>
+                  <button className="button-primary"
+                    onClick={() => setTab("Intelligence")}>
+                    Open Intelligence Center →
+                  </button>
+                </div>
+
+                <div className="section-head">
+                  <div className="section-title">Agent Overview</div>
+                  <div className="section-note">Setup stage</div>
+                </div>
+
+                <div className="status-card">
+                  <div className="status-top">
+                    <div className="status-name">✳ AI Agent Status</div>
+                    <span className="status-pill">Setup pending</span>
+                  </div>
+                  <div className="status-desc">
+                    YouTube and AI services are not connected yet.
+                    Real monitoring will begin after integration.
+                  </div>
+                </div>
+
+                <div className="stat-grid">
+                  <div className="stat">
+                    <div className="stat-label">Issues Detected</div>
+                    <div className="stat-value blue">—</div>
+                    <div className="stat-sub">Awaiting channel data</div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat-label">Tasks Completed</div>
+                    <div className="stat-value blue">—</div>
+                    <div className="stat-sub">No agent activity yet</div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat-label">Pending Approvals</div>
+                    <div className="stat-value blue">—</div>
+                    <div className="stat-sub">Nothing submitted yet</div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat-label">Automation</div>
+                    <div className="stat-value blue">OFF</div>
+                    <div className="stat-sub">Not connected</div>
+                  </div>
+                </div>
+
+                <div className="section-head">
+                  <div className="section-title">Recent Agent Activity</div>
+                  <button className="section-note"
+                    onClick={() => setPage("Agent Activity")}>
+                    View all →
+                  </button>
+                </div>
+
+                <div className="status-card">
+                  {activities.slice(0,3).map((item) => (
+                    <div className="activity-item" key={item[0]}>
+                      <span className="activity-dot"></span>
+                      <div>
+                        <div className="activity-name">{item[0]}</div>
+                        <div className="activity-desc">{item[1]}</div>
+                      </div>
+                      <span className="activity-status">{item[2]}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {tab === "Intelligence" && (
+              <>
+                <div className="notice">
+                  ✳ Intelligence Center: AI analysis and monitoring
+                  will become active after YouTube and AI integrations.
+                  No sample results are presented as real data.
+                </div>
+                <div className="section-head">
+                  <div className="section-title">Intelligence Modules</div>
+                  <div className="section-note">8 modules</div>
+                </div>
+                <div className="tool-list">
+                  {intelligence.map(([icon,title,desc]) => (
+                    <Card key={title} icon={icon} title={title}
+                      desc={desc} onClick={() => openPage(title)} />
+                  ))}
+                </div>
+                <div className="section-head">
+                  <div className="section-title">Agent Activity</div>
+                  <button className="section-note"
+                    onClick={() => openPage("Agent Activity")}>View all →</button>
+                </div>
+                <div className="status-card">
+                  {activities.map((item) => (
+                    <div className="activity-item" key={item[0]}>
+                      <span className="activity-dot"></span>
+                      <div>
+                        <div className="activity-name">{item[0]}</div>
+                        <div className="activity-desc">{item[1]}</div>
+                      </div>
+                      <span className="activity-status">{item[2]}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {tab === "Production" && (
+              <>
+                <div className="notice">
+                  Your complete Shorts production pipeline.
+                  AI-generated content will require review before publishing.
+                </div>
+                <div className="section-head">
+                  <div className="section-title">Production Tools</div>
+                  <div className="section-note">7 modules</div>
+                </div>
+                <div className="tool-list">
+                  {production.map(([icon,title,desc]) => (
+                    <Card key={title} icon={icon} title={title}
+                      desc={desc} onClick={() => openPage(title)} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {tab === "More" && (
+              <>
+                <div className="section-head">
+                  <div className="section-title">Workspace Controls</div>
+                </div>
+                <div className="detail-panel">
+                  {[
+                    ["Approval Center","Review important AI actions"],
+                    ["Automation Settings","Control automatic actions"],
+                    ["Agent Settings","Configure your AI agent"],
+                    ["Task History","Review previous agent activity"],
+                    ["Connected Services","Manage YouTube and AI integrations"],
+                  ].map(([name,desc]) => (
+                    <div className="setting-row" key={name}
+                      onClick={() => openPage(name)}>
+                      <div>
+                        <div className="setting-name">{name}</div>
+                        <div className="setting-desc">{desc}</div>
+                      </div>
+                      <span className="blue">›</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="section-head">
+                  <div className="section-title">Automation Preference</div>
+                </div>
+                <div className="detail-panel">
+                  <div className="setting-row">
+                    <div>
+                      <div className="setting-name">Autonomous Mode</div>
+                      <div className="setting-desc">
+                        Preference only. Automation is not connected yet.
+                      </div>
+                    </div>
+                    <button
+                      className={`toggle ${auto ? "on" : ""}`}
+                      onClick={() => setAuto(!auto)}
+                      aria-label="Toggle autonomous mode"
+                    >
+                      <span className="toggle-dot"></span>
+                    </button>
+                  </div>
+                  <div className="setting-desc">
+                    Publishing, replies and important channel changes
+                    will still follow their approval rules.
+                  </div>
+                </div>
+              </>
+            )}
+          </>
         )}
-      </section>
+      </div>
+
+      <nav className="bottom-nav">
+        {[
+          ["Home","⌂"],
+          ["Intelligence","✳"],
+          ["Production","▣"],
+          ["More","•••"],
+        ].map(([name,icon]) => (
+          <button key={name}
+            className={tab === name && !page ? "active" : ""}
+            onClick={() => { setTab(name); setPage(""); }}>
+            <span className="bottom-icon">{icon}</span>
+            {name}
+          </button>
+        ))}
+      </nav>
     </main>
   );
 }
