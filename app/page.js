@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -76,6 +75,9 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [connectingYoutube, setConnectingYoutube] = useState(false);
+  const [youtubeNotice, setYoutubeNotice] = useState("");
+  const [youtubeNoticeType, setYoutubeNoticeType] = useState("success");
   const [activeTab, setActiveTab] = useState("Home");
 
   const [automation, setAutomation] = useState(true);
@@ -87,6 +89,25 @@ export default function Home() {
   const [dbChannels, setDbChannels] = useState([]);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbError, setDbError] = useState("");
+
+  // Read the result of the Google OAuth callback.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("youtube");
+    const error = params.get("youtube_error");
+
+    if (connected === "connected") {
+      setYoutubeNotice("YouTube channel connected successfully.");
+      setYoutubeNoticeType("success");
+    } else if (error) {
+      setYoutubeNotice(error);
+      setYoutubeNoticeType("error");
+    }
+
+    if (connected || error) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   // Authentication check
   useEffect(() => {
@@ -194,6 +215,44 @@ export default function Home() {
     };
   }, [user]);
 
+  async function handleConnectYoutube() {
+    if (connectingYoutube) return;
+
+    setConnectingYoutube(true);
+    setYoutubeNotice("");
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.access_token) {
+        throw new Error("Your login session has expired. Please log in again.");
+      }
+
+      const response = await fetch("/api/youtube/connect", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.url) {
+        throw new Error(result.error || "Could not start YouTube connection.");
+      }
+
+      window.location.assign(result.url);
+    } catch (error) {
+      setYoutubeNotice(error.message || "YouTube connection could not start.");
+      setYoutubeNoticeType("error");
+      setConnectingYoutube(false);
+    }
+  }
+
   async function handleLogout() {
     if (loggingOut) return;
 
@@ -258,20 +317,37 @@ export default function Home() {
               <span className="pulse-dot" />
               AI AGENT STATUS
             </div>
-            <h2>Your agent is ready<br />for configuration.</h2>
+            <h2>
+              {dbChannels.length > 0
+                ? "Your YouTube channel is connected."
+                : "Connect your YouTube channel."}
+            </h2>
             <p>
-              Connect your YouTube channel to begin intelligent
-              monitoring and automated content production.
+              {dbChannels.length > 0
+                ? "Your channel is linked. You can reconnect if you need to refresh Google access."
+                : "Authorize CreatorOS to read your channel and video information."}
             </p>
             <button
               className="primary-button"
-              onClick={() => setActiveTab("More")}
+              onClick={handleConnectYoutube}
+              disabled={connectingYoutube}
             >
-              Configure Agent <span>→</span>
+              {connectingYoutube
+                ? "Connecting..."
+                : dbChannels.length > 0
+                ? "Reconnect YouTube"
+                : "Connect YouTube"}
+              <span>→</span>
             </button>
           </div>
           <div className="robot-art">🤖</div>
         </div>
+
+        {youtubeNotice && (
+          <div className={youtubeNoticeType === "error" ? "database-error" : "youtube-success"}>
+            {youtubeNotice}
+          </div>
+        )}
 
         {dbError && (
           <div className="database-error">
@@ -898,6 +974,17 @@ export default function Home() {
         }
 
         .primary-button span { margin-left: 12px; }
+        .primary-button:disabled { opacity: 0.6; cursor: wait; }
+
+        .youtube-success {
+          color: #70e0ad;
+          background: #102b22;
+          border: 1px solid #245b43;
+          border-radius: 10px;
+          padding: 12px;
+          font-size: 11px;
+          margin: 12px 0;
+        }
 
         .section-title {
           display: flex;
