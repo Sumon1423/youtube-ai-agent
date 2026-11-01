@@ -257,7 +257,21 @@ export default function Home() {
         cache: "no-store",
       });
 
-      const result = await response.json();
+      const rawResponse = await response.text();
+
+let result;
+
+try {
+  result = JSON.parse(rawResponse);
+} catch {
+  throw new Error(
+    `API returned non-JSON response. HTTP ${response.status}. Response: ${rawResponse.slice(0, 300)}`
+  );
+}
+
+if (!response.ok || !result.success) {
+  throw new Error(result.error || "YouTube sync failed.");
+}
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "YouTube sync failed.");
