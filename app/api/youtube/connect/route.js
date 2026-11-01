@@ -110,10 +110,17 @@ export async function POST(request) {
     googleUrl.searchParams.set("client_id", clientId);
     googleUrl.searchParams.set("redirect_uri", redirectUri);
     googleUrl.searchParams.set("response_type", "code");
+
     googleUrl.searchParams.set(
       "scope",
-      "openid email https://www.googleapis.com/auth/youtube.readonly"
+      [
+        "openid",
+        "email",
+        "https://www.googleapis.com/auth/youtube.readonly",
+        "https://www.googleapis.com/auth/yt-analytics.readonly",
+      ].join(" ")
     );
+
     googleUrl.searchParams.set("access_type", "offline");
     googleUrl.searchParams.set("prompt", "consent");
     googleUrl.searchParams.set(
