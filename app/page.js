@@ -1,23 +1,144 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
-// Existing dashboard data and design will remain here.
-// Authentication protection is handled before showing dashboard.
+const intelligence = [
+  {
+    icon: "📡",
+    title: "Channel Monitor",
+    desc: "Monitor channel performance and detect changes.",
+    status: "Waiting",
+  },
+  {
+    icon: "🩺",
+    title: "Video Doctor",
+    desc: "Find reasons behind low-performing videos.",
+    status: "Waiting",
+  },
+  {
+    icon: "🔎",
+    title: "SEO Intelligence",
+    desc: "Review titles, descriptions and keywords.",
+    status: "Waiting",
+  },
+  {
+    icon: "📈",
+    title: "Trend Radar",
+    desc: "Discover trending topics for USA viewers.",
+    status: "Waiting",
+  },
+  {
+    icon: "👥",
+    title: "Audience Insights",
+    desc: "Understand viewer behavior and interests.",
+    status: "Waiting",
+  },
+  {
+    icon: "💬",
+    title: "Comment Center",
+    desc: "Monitor comments and prepare replies.",
+    status: "Waiting",
+  },
+  {
+    icon: "🎯",
+    title: "Competitor Watch",
+    desc: "Track similar channels and content.",
+    status: "Waiting",
+  },
+  {
+    icon: "🧠",
+    title: "Growth Intelligence",
+    desc: "Build strategies using channel data.",
+    status: "Waiting",
+  },
+];
+
+const production = [
+  {
+    icon: "💡",
+    title: "Video Ideas",
+    desc: "AI-selected video topics and concepts.",
+  },
+  {
+    icon: "✍️",
+    title: "Script Studio",
+    desc: "Create and review video scripts.",
+  },
+  {
+    icon: "🖼️",
+    title: "Asset Manager",
+    desc: "Manage images, clips and visual assets.",
+  },
+  {
+    icon: "🎙️",
+    title: "Voice Studio",
+    desc: "Generate narration for your videos.",
+  },
+  {
+    icon: "🎬",
+    title: "AI Editor",
+    desc: "Editing style, captions, transitions and SFX.",
+  },
+  {
+    icon: "▶️",
+    title: "Video Preview",
+    desc: "Review the final video before publishing.",
+  },
+  {
+    icon: "🚀",
+    title: "Publishing",
+    desc: "Prepare and publish approved videos.",
+  },
+];
+
+const initialActivities = [
+  {
+    icon: "🔐",
+    title: "Authentication",
+    detail: "Account connected successfully",
+    time: "Current session",
+    status: "Completed",
+  },
+  {
+    icon: "📊",
+    title: "Channel analysis",
+    detail: "Waiting for YouTube connection",
+    time: "Not started",
+    status: "Waiting",
+  },
+  {
+    icon: "🤖",
+    title: "AI Agent",
+    detail: "Automation system is not configured yet",
+    time: "Not started",
+    status: "Waiting",
+  },
+];
+
+const tabs = [
+  { id: "Home", icon: "⌂", label: "Home" },
+  { id: "Intelligence", icon: "◈", label: "Intelligence" },
+  { id: "Production", icon: "▣", label: "Production" },
+  { id: "More", icon: "•••", label: "More" },
+];
 
 export default function Home() {
   const router = useRouter();
+
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [activeTab, setActiveTab] = useState("Home");
+  const [automation, setAutomation] = useState(true);
+  const [notifications, setNotifications] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    const checkSession = async () => {
+    async function checkSession() {
       const { data, error } = await supabase.auth.getSession();
 
       if (!mounted) return;
@@ -29,7 +150,7 @@ export default function Home() {
 
       setUser(data.session.user);
       setChecking(false);
-    };
+    }
 
     checkSession();
 
@@ -39,10 +160,13 @@ export default function Home() {
       if (!mounted) return;
 
       if (event === "SIGNED_OUT" || !session) {
+        setUser(null);
         router.replace("/login");
-      } else {
-        setUser(session.user);
+        return;
       }
+
+      setUser(session.user);
+      setChecking(false);
     });
 
     return () => {
@@ -52,6 +176,8 @@ export default function Home() {
   }, [router]);
 
   async function handleLogout() {
+    if (loggingOut) return;
+
     setLoggingOut(true);
 
     const { error } = await supabase.auth.signOut();
@@ -65,46 +191,1116 @@ export default function Home() {
     router.replace("/login");
   }
 
-  if (checking) {
+  if (checking || !user) {
     return (
-      <main style={{
-        minHeight: "100dvh",
-        background: "#080d15",
-        color: "white",
-        display: "grid",
-        placeItems: "center",
-        fontFamily: "Arial"
-      }}>
-        Checking your session...
+      <main className="loading-screen">
+        <div className="loading-logo">C</div>
+        <div className="loading-spinner" />
+        <p>Checking your session...</p>
       </main>
     );
   }
 
-  return (
-    <main style={{
-      minHeight: "100dvh",
-      background: "#080d15",
-      color: "white",
-      padding: 20,
-      fontFamily: "Arial"
-    }}>
-      <h2>CreatorOS Authentication</h2>
-      <p>Logged in as: {user?.email}</p>
+  function SectionTitle({ title, subtitle, action }) {
+    return (
+      <div className="section-title">
+        <div>
+          <h2>{title}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
+        {action && <span className="section-action">{action}</span>}
+      </div>
+    );
+  }
 
-      <button
-        onClick={handleLogout}
-        disabled={loggingOut}
-        style={{
-          background: "#2789ef",
-          color: "white",
-          padding: "12px 20px",
-          border: 0,
-          borderRadius: 8,
-          marginTop: 15
-        }}
-      >
-        {loggingOut ? "Logging out..." : "Logout"}
+  function Status({ children }) {
+    const type =
+      children === "Completed"
+        ? "success"
+        : children === "Running"
+        ? "running"
+        : "waiting";
+
+    return <span className={`status ${type}`}>{children}</span>;
+  }
+
+  function ModuleCard({ icon, title, desc, status, onClick }) {
+    return (
+      <button className="module-card" onClick={onClick || (() => {})}>
+        <div className="module-top">
+          <span className="module-icon">{icon}</span>
+          {status && <Status>{status}</Status>}
+        </div>
+        <h3>{title}</h3>
+        <p>{desc}</p>
+        <div className="module-arrow">Explore <span>↗</span></div>
       </button>
+    );
+  }
+
+  function renderHome() {
+    return (
+      <>
+        <div className="welcome">
+          <div>
+            <span className="eyebrow">YOUR AI WORKSPACE</span>
+            <h1>Creator<span>OS</span></h1>
+            <p>Your personal AI YouTube channel manager.</p>
+          </div>
+          <div className="profile-icon">
+            {(user.email || "U").charAt(0).toUpperCase()}
+          </div>
+        </div>
+
+        <div className="hero-card">
+          <div className="hero-glow" />
+          <div className="hero-content">
+            <div className="agent-label">
+              <span className="pulse-dot" />
+              AI AGENT STATUS
+            </div>
+            <h2>Your agent is ready<br />for configuration.</h2>
+            <p>
+              Connect your YouTube channel to begin intelligent
+              monitoring and automated content production.
+            </p>
+            <button
+              className="primary-button"
+              onClick={() => setActiveTab("More")}
+            >
+              Configure Agent <span>→</span>
+            </button>
+          </div>
+          <div className="robot-art">🤖</div>
+        </div>
+
+        <SectionTitle
+          title="Workspace Overview"
+          subtitle="Your agent's operational status"
+        />
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-icon">⚠️</span>
+            <strong>—</strong>
+            <p>Detected Issues</p>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">✓</span>
+            <strong>0</strong>
+            <p>Completed Tasks</p>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">⌛</span>
+            <strong>0</strong>
+            <p>Pending Approvals</p>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">◉</span>
+            <strong className="small-stat">Inactive</strong>
+            <p>Agent Status</p>
+          </div>
+        </div>
+
+        <SectionTitle
+          title="Agent Activity"
+          subtitle="Recent workspace events"
+          action="View all"
+        />
+
+        <div className="activity-card">
+          {initialActivities.map((item, index) => (
+            <div className="activity-item" key={index}>
+              <div className="activity-icon">{item.icon}</div>
+              <div className="activity-info">
+                <strong>{item.title}</strong>
+                <p>{item.detail}</p>
+                <span>{item.time}</span>
+              </div>
+              <Status>{item.status}</Status>
+            </div>
+          ))}
+        </div>
+
+        <div className="notice-card">
+          <span>ℹ️</span>
+          <div>
+            <strong>Setup required</strong>
+            <p>
+              Your dashboard is connected to your account.
+              YouTube integration and AI services are not connected yet.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderIntelligence() {
+    return (
+      <>
+        <div className="page-heading">
+          <span className="eyebrow">AI CONTROL CENTER</span>
+          <h1>Intelligence</h1>
+          <p>Your channel's research and analysis hub.</p>
+        </div>
+
+        <div className="intelligence-banner">
+          <div className="banner-icon">🧠</div>
+          <div>
+            <strong>AI Intelligence Center</strong>
+            <p>
+              Monitor, analyze and discover opportunities
+              using your channel data.
+            </p>
+          </div>
+        </div>
+
+        <SectionTitle
+          title="Intelligence Modules"
+          subtitle="Your AI analysis tools"
+        />
+
+        <div className="module-grid">
+          {intelligence.map((item) => (
+            <ModuleCard
+              key={item.title}
+              {...item}
+              onClick={() =>
+                alert(`${item.title}: YouTube integration is not connected yet.`)
+              }
+            />
+          ))}
+        </div>
+
+        <SectionTitle
+          title="Channel Protection"
+          subtitle="Keep track of channel health"
+        />
+
+        <div className="protection-card">
+          <div className="protection-icon">🛡️</div>
+          <div>
+            <strong>Channel Health Monitor</strong>
+            <p>Copyright, policy and restriction checks.</p>
+            <Status>Waiting</Status>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderProduction() {
+    return (
+      <>
+        <div className="page-heading">
+          <span className="eyebrow">CONTENT WORKFLOW</span>
+          <h1>Production</h1>
+          <p>From video research to final publishing.</p>
+        </div>
+
+        <div className="production-banner">
+          <span className="production-banner-icon">🎬</span>
+          <div>
+            <strong>AI Video Production</strong>
+            <p>
+              Create, edit, review and prepare your next
+              YouTube Short.
+            </p>
+          </div>
+        </div>
+
+        <SectionTitle
+          title="Production Studio"
+          subtitle="Your content creation tools"
+        />
+
+        <div className="module-grid">
+          {production.map((item) => (
+            <ModuleCard
+              key={item.title}
+              {...item}
+              onClick={() =>
+                alert(`${item.title}: This module is not connected yet.`)
+              }
+            />
+          ))}
+        </div>
+
+        <div className="approval-card">
+          <div className="approval-icon">✓</div>
+          <div>
+            <strong>Approval Center</strong>
+            <p>
+              Review scripts, assets and videos before
+              anything gets published.
+            </p>
+            <Status>0 Pending</Status>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderMore() {
+    return (
+      <>
+        <div className="page-heading">
+          <span className="eyebrow">WORKSPACE SETTINGS</span>
+          <h1>More</h1>
+          <p>Manage your account and agent preferences.</p>
+        </div>
+
+        <SectionTitle title="Account" subtitle="Your signed-in account" />
+
+        <div className="account-card">
+          <div className="account-avatar">
+            {(user.email || "U").charAt(0).toUpperCase()}
+          </div>
+          <div className="account-info">
+            <strong>{user.email}</strong>
+            <p>Supabase authenticated account</p>
+            <Status>Connected</Status>
+          </div>
+        </div>
+
+        <SectionTitle
+          title="Automation Controls"
+          subtitle="Choose how your agent should operate"
+        />
+
+        <div className="settings-card">
+          <div className="setting-row">
+            <div>
+              <strong>Automation Preference</strong>
+              <p>Allow safe background analysis and research.</p>
+            </div>
+            <button
+              className={`toggle ${automation ? "active" : ""}`}
+              onClick={() => setAutomation(!automation)}
+              aria-label="Toggle automation"
+            >
+              <span />
+            </button>
+          </div>
+
+          <div className="setting-divider" />
+
+          <div className="setting-row">
+            <div>
+              <strong>Notifications</strong>
+              <p>Show alerts for tasks and approvals.</p>
+            </div>
+            <button
+              className={`toggle ${notifications ? "active" : ""}`}
+              onClick={() => setNotifications(!notifications)}
+              aria-label="Toggle notifications"
+            >
+              <span />
+            </button>
+          </div>
+        </div>
+
+        <SectionTitle title="Agent Settings" />
+
+        <div className="settings-card">
+          <div className="simple-setting">
+            <span>🌎</span>
+            <div>
+              <strong>Target Audience</strong>
+              <p>United States (USA)</p>
+            </div>
+          </div>
+          <div className="setting-divider" />
+          <div className="simple-setting">
+            <span>📱</span>
+            <div>
+              <strong>Content Format</strong>
+              <p>YouTube Shorts · Vertical 9:16</p>
+            </div>
+          </div>
+          <div className="setting-divider" />
+          <div className="simple-setting">
+            <span>🔒</span>
+            <div>
+              <strong>Approval Policy</strong>
+              <p>Manual approval before publishing</p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          className="logout-button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+        >
+          {loggingOut ? "Logging out..." : "↪  Logout"}
+        </button>
+
+        <p className="version-text">CreatorOS · Version 1.0</p>
+      </>
+    );
+  }
+
+  return (
+    <main className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark">C</div>
+          <div>
+            <strong>CreatorOS</strong>
+            <span>AI YOUTUBE WORKSPACE</span>
+          </div>
+        </div>
+        <div className="topbar-right">
+          <span className="connection-dot" />
+          <span className="connection-text">Account</span>
+          <div className="top-avatar">
+            {(user.email || "U").charAt(0).toUpperCase()}
+          </div>
+        </div>
+      </header>
+
+      <div className="main-content">
+        {activeTab === "Home" && renderHome()}
+        {activeTab === "Intelligence" && renderIntelligence()}
+        {activeTab === "Production" && renderProduction()}
+        {activeTab === "More" && renderMore()}
+      </div>
+
+      <nav className="bottom-nav">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`nav-item ${activeTab === tab.id ? "selected" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span className="nav-icon">{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          background: #080d15;
+          color: #edf4ff;
+          font-family: Arial, Helvetica, sans-serif;
+        }
+
+        button {
+          font: inherit;
+        }
+
+        .app-shell {
+          min-height: 100dvh;
+          background:
+            radial-gradient(ellipse at 50% -15%, #142b49 0%, transparent 48%),
+            #080d15;
+          padding-bottom: 100px;
+        }
+
+        .loading-screen {
+          min-height: 100dvh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          background: #080d15;
+          color: #a9b8cc;
+        }
+
+        .loading-logo, .brand-mark {
+          display: grid;
+          place-items: center;
+          background: linear-gradient(145deg, #2789ef, #1555bd);
+          color: white;
+          font-weight: 900;
+          border-radius: 14px;
+        }
+
+        .loading-logo {
+          width: 58px;
+          height: 58px;
+          font-size: 28px;
+        }
+
+        .loading-spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid #253a56;
+          border-top-color: #3198ff;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .topbar {
+          height: 68px;
+          padding: 0 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid #1b2a3d;
+          background: rgba(8, 13, 21, 0.92);
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          backdrop-filter: blur(15px);
+        }
+
+        .brand, .topbar-right {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .brand-mark {
+          width: 38px;
+          height: 38px;
+          font-size: 21px;
+        }
+
+        .brand strong {
+          display: block;
+          font-size: 15px;
+        }
+
+        .brand span {
+          display: block;
+          color: #71839a;
+          font-size: 8px;
+          letter-spacing: 1.1px;
+          margin-top: 3px;
+        }
+
+        .connection-dot, .pulse-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #e9aa48;
+          display: inline-block;
+        }
+
+        .connection-text {
+          color: #8798ad;
+          font-size: 11px;
+        }
+
+        .top-avatar, .profile-icon, .account-avatar {
+          display: grid;
+          place-items: center;
+          background: #17365b;
+          color: #83c3ff;
+          border: 1px solid #28517d;
+          font-weight: 700;
+          border-radius: 50%;
+        }
+
+        .top-avatar {
+          width: 32px;
+          height: 32px;
+          font-size: 13px;
+        }
+
+        .main-content {
+          max-width: 680px;
+          margin: 0 auto;
+          padding: 23px 17px 30px;
+        }
+
+        .welcome {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 22px;
+        }
+
+        .eyebrow {
+          color: #4ca9ff;
+          font-size: 9px;
+          letter-spacing: 1.8px;
+          font-weight: 800;
+        }
+
+        .welcome h1 {
+          font-size: 30px;
+          margin: 7px 0 5px;
+          letter-spacing: -1px;
+        }
+
+        .welcome h1 span {
+          color: #398ff0;
+        }
+
+        .welcome p, .page-heading p {
+          margin: 0;
+          color: #8c9bb0;
+          font-size: 12px;
+          line-height: 1.6;
+        }
+
+        .profile-icon {
+          width: 43px;
+          height: 43px;
+          font-size: 18px;
+        }
+
+        .hero-card {
+          position: relative;
+          overflow: hidden;
+          border: 1px solid #24518a;
+          border-radius: 19px;
+          background: linear-gradient(120deg, #102d50, #0c1a2c 72%);
+          min-height: 218px;
+          padding: 22px 19px;
+          margin-bottom: 29px;
+        }
+
+        .hero-glow {
+          position: absolute;
+          width: 170px;
+          height: 170px;
+          right: -70px;
+          top: -65px;
+          border-radius: 50%;
+          background: #1479e7;
+          filter: blur(75px);
+          opacity: 0.3;
+        }
+
+        .hero-content {
+          position: relative;
+          z-index: 1;
+          max-width: 78%;
+        }
+
+        .agent-label {
+          color: #80c2ff;
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 1.3px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .pulse-dot {
+          background: #48d7a0;
+          box-shadow: 0 0 10px #48d7a0;
+        }
+
+        .hero-card h2 {
+          font-size: 21px;
+          line-height: 1.3;
+          margin: 15px 0 8px;
+        }
+
+        .hero-card p {
+          color: #a7bad1;
+          font-size: 11px;
+          line-height: 1.65;
+          margin: 0 0 15px;
+        }
+
+        .robot-art {
+          position: absolute;
+          right: 10px;
+          bottom: 24px;
+          font-size: 62px;
+          opacity: 0.75;
+          filter: drop-shadow(0 0 20px #288df0);
+        }
+
+        .primary-button {
+          border: 0;
+          border-radius: 9px;
+          padding: 10px 13px;
+          color: white;
+          background: #247ee0;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .primary-button span {
+          margin-left: 12px;
+        }
+
+        .section-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin: 26px 0 13px;
+        }
+
+        .section-title h2 {
+          font-size: 15px;
+          margin: 0;
+        }
+
+        .section-title p {
+          color: #77899f;
+          font-size: 10px;
+          margin: 5px 0 0;
+        }
+
+        .section-action {
+          color: #58aaff;
+          font-size: 10px;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+
+        .stat-card, .activity-card, .settings-card,
+        .account-card, .protection-card, .approval-card {
+          background: #0e1724;
+          border: 1px solid #1c2b3f;
+          border-radius: 13px;
+        }
+
+        .stat-card {
+          min-height: 104px;
+          padding: 13px;
+        }
+
+        .stat-icon {
+          display: block;
+          font-size: 15px;
+          margin-bottom: 7px;
+        }
+
+        .stat-card strong {
+          display: block;
+          font-size: 22px;
+        }
+
+        .stat-card .small-stat {
+          font-size: 15px;
+          margin-top: 5px;
+        }
+
+        .stat-card p {
+          color: #7f90a5;
+          font-size: 10px;
+          margin: 5px 0 0;
+        }
+
+        .activity-card {
+          padding: 0 13px;
+        }
+
+        .activity-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 0;
+          border-bottom: 1px solid #1b293a;
+        }
+
+        .activity-item:last-child {
+          border-bottom: 0;
+        }
+
+        .activity-icon, .module-icon {
+          display: grid;
+          place-items: center;
+          background: #14243a;
+          border: 1px solid #263d5a;
+          border-radius: 10px;
+          flex-shrink: 0;
+        }
+
+        .activity-icon {
+          width: 35px;
+          height: 35px;
+          font-size: 15px;
+        }
+
+        .activity-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .activity-info strong {
+          font-size: 11px;
+        }
+
+        .activity-info p {
+          color: #8b9bb0;
+          font-size: 9px;
+          margin: 4px 0;
+        }
+
+        .activity-info > span {
+          color: #61758e;
+          font-size: 8px;
+        }
+
+        .status {
+          display: inline-block;
+          white-space: nowrap;
+          border-radius: 20px;
+          padding: 5px 7px;
+          font-size: 8px;
+          font-weight: 700;
+          background: #222c3a;
+          color: #a5b4c8;
+        }
+
+        .status.success {
+          background: #123629;
+          color: #5cdaa1;
+        }
+
+        .status.running {
+          background: #173658;
+          color: #75baff;
+        }
+
+        .status.waiting {
+          background: #292b32;
+          color: #a8aab4;
+        }
+
+        .notice-card {
+          display: flex;
+          gap: 11px;
+          padding: 14px;
+          margin-top: 15px;
+          border: 1px solid #35405a;
+          border-radius: 12px;
+          background: #111b2b;
+        }
+
+        .notice-card > span {
+          font-size: 18px;
+        }
+
+        .notice-card strong {
+          font-size: 11px;
+        }
+
+        .notice-card p {
+          color: #8e9eb3;
+          font-size: 10px;
+          line-height: 1.6;
+          margin: 5px 0 0;
+        }
+
+        .page-heading {
+          margin: 5px 0 22px;
+        }
+
+        .page-heading h1 {
+          font-size: 28px;
+          margin: 7px 0;
+          letter-spacing: -0.7px;
+        }
+
+        .intelligence-banner, .production-banner {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          padding: 17px;
+          border: 1px solid #234b79;
+          border-radius: 14px;
+          background: linear-gradient(110deg, #102b4b, #0e1929);
+          margin-bottom: 24px;
+        }
+
+        .banner-icon, .production-banner-icon {
+          font-size: 27px;
+        }
+
+        .intelligence-banner strong, .production-banner strong {
+          font-size: 12px;
+        }
+
+        .intelligence-banner p, .production-banner p {
+          color: #9aacc2;
+          font-size: 10px;
+          line-height: 1.5;
+          margin: 5px 0 0;
+        }
+
+        .module-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .module-card {
+          text-align: left;
+          min-width: 0;
+          min-height: 155px;
+          padding: 13px;
+          border: 1px solid #1d2d42;
+          border-radius: 13px;
+          background: #0e1724;
+          color: #edf4ff;
+          cursor: pointer;
+        }
+
+        .module-card:active {
+          border-color: #348fe8;
+          transform: scale(0.99);
+        }
+
+        .module-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 4px;
+        }
+
+        .module-icon {
+          width: 35px;
+          height: 35px;
+          font-size: 17px;
+        }
+
+        .module-card h3 {
+          font-size: 11px;
+          margin: 13px 0 6px;
+        }
+
+        .module-card p {
+          min-height: 29px;
+          color: #8495aa;
+          font-size: 9px;
+          line-height: 1.5;
+          margin: 0;
+        }
+
+        .module-arrow {
+          display: flex;
+          justify-content: space-between;
+          color: #55a8ff;
+          font-size: 9px;
+          margin-top: 12px;
+        }
+
+        .protection-card, .approval-card {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          padding: 15px;
+          margin-top: 12px;
+        }
+
+        .protection-icon, .approval-icon {
+          display: grid;
+          place-items: center;
+          width: 40px;
+          height: 40px;
+          background: #152b45;
+          border-radius: 11px;
+          font-size: 19px;
+        }
+
+        .protection-card strong, .approval-card strong {
+          font-size: 11px;
+        }
+
+        .protection-card p, .approval-card p {
+          color: #899bb1;
+          font-size: 9px;
+          margin: 5px 0 8px;
+        }
+
+        .approval-icon {
+          color: #5cdaa1;
+          font-size: 20px;
+        }
+
+        .account-card {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          padding: 16px;
+        }
+
+        .account-avatar {
+          width: 43px;
+          height: 43px;
+          font-size: 18px;
+        }
+
+        .account-info {
+          min-width: 0;
+        }
+
+        .account-info strong {
+          font-size: 11px;
+          overflow-wrap: anywhere;
+        }
+
+        .account-info p {
+          color: #8395ab;
+          font-size: 9px;
+          margin: 5px 0 8px;
+        }
+
+        .settings-card {
+          padding: 0 14px;
+        }
+
+        .setting-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 15px 0;
+        }
+
+        .setting-row strong, .simple-setting strong {
+          font-size: 11px;
+        }
+
+        .setting-row p, .simple-setting p {
+          color: #8596aa;
+          font-size: 9px;
+          line-height: 1.5;
+          margin: 5px 0 0;
+        }
+
+        .setting-divider {
+          height: 1px;
+          background: #1e2c3e;
+        }
+
+        .toggle {
+          width: 42px;
+          height: 24px;
+          border: 0;
+          border-radius: 20px;
+          background: #344153;
+          padding: 3px;
+          flex-shrink: 0;
+          cursor: pointer;
+        }
+
+        .toggle span {
+          display: block;
+          width: 18px;
+          height: 18px;
+          background: white;
+          border-radius: 50%;
+          transition: transform 0.2s;
+        }
+
+        .toggle.active {
+          background: #247ee0;
+        }
+
+        .toggle.active span {
+          transform: translateX(18px);
+        }
+
+        .simple-setting {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 0;
+        }
+
+        .simple-setting > span {
+          font-size: 18px;
+        }
+
+        .logout-button {
+          width: 100%;
+          margin-top: 25px;
+          padding: 13px;
+          border: 1px solid #713b45;
+          border-radius: 11px;
+          color: #ff929d;
+          background: #29161d;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .logout-button:disabled {
+          opacity: 0.5;
+        }
+
+        .version-text {
+          color: #53657b;
+          text-align: center;
+          font-size: 9px;
+          margin: 18px 0 0;
+        }
+
+        .bottom-nav {
+          position: fixed;
+          z-index: 20;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          padding: 9px 8px calc(9px + env(safe-area-inset-bottom));
+          background: rgba(10, 17, 27, 0.97);
+          border-top: 1px solid #1e2d41;
+          backdrop-filter: blur(18px);
+        }
+
+        .nav-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          border: 0;
+          background: transparent;
+          color: #71839a;
+          font-size: 9px;
+          padding: 4px 0;
+          cursor: pointer;
+        }
+
+        .nav-icon {
+          font-size: 20px;
+          line-height: 1;
+        }
+
+        .nav-item.selected {
+          color: #5aabff;
+        }
+
+        .nav-item.selected .nav-icon {
+          text-shadow: 0 0 15px #2789ef;
+        }
+
+        @media (min-width: 600px) {
+          .main-content {
+            padding-top: 30px;
+          }
+
+          .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+
+          .module-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+      `}</style>
     </main>
   );
 }
