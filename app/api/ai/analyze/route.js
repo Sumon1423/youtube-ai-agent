@@ -15,6 +15,10 @@ const supabase = createClient(
   }
 );
 
+// ------------------------------
+// ANALYTICS HELPERS
+// ------------------------------
+
 function getAnalytics(video) {
   const performance = video?.performance_data || {};
 
@@ -74,7 +78,9 @@ function prepareVideo(video) {
       video.comments_count
     ),
 
-    shares: safeNumber(analytics?.shares),
+    shares: safeNumber(
+      analytics?.shares
+    ),
 
     averageViewDurationSeconds: safeNumber(
       analytics?.averageViewDurationSeconds ??
@@ -98,6 +104,10 @@ function prepareVideo(video) {
   };
 }
 
+// ------------------------------
+// JSON HELPER
+// ------------------------------
+
 function extractJSON(text) {
   if (!text) {
     throw new Error("Gemini returned an empty response.");
@@ -108,6 +118,7 @@ function extractJSON(text) {
   cleaned = cleaned
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
+    .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "");
 
   const start = cleaned.indexOf("{");
@@ -117,155 +128,188 @@ function extractJSON(text) {
     throw new Error("Gemini did not return valid JSON.");
   }
 
-  return JSON.parse(cleaned.slice(start, end + 1));
+  return JSON.parse(
+    cleaned.slice(start, end + 1)
+  );
 }
 
-// Wait helper
+// ------------------------------
+// RETRY HELPERS
+// ------------------------------
+
 function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
-// Identify temporary API errors
 function isTemporaryError(status) {
-  return [408, 429, 500, 502, 503, 504].includes(status);
+  return [
+    408,
+    429,
+    500,
+    502,
+    503,
+    504,
+  ].includes(status);
 }
 
-// Retry Gemini and use a fallback model if necessary
-async function callGemini(systemInstruction, userPrompt, apiKey) {
-  const models = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.8-flash",
-  ];
+async function callGemini(
+  systemInstruction,
+  userPrompt,
+  apiKey
+) {
+  const model = "gemini-3.5-flash-lite";
+
+  const maxAttempts = 3;
 
   let lastError = null;
 
-  for (const model of models) {
-    // Two attempts per model
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        console.log(
-          `Trying Gemini model: ${model}, attempt: ${attempt}`
-        );
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts;
+    attempt++
+  ) {
+    try {
+      console.log(
+        `Gemini attempt ${attempt}/${maxAttempts}`
+      );
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [{ text: systemInstruction }],
-              },
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
 
-              contents: [
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
                 {
-                  role: "user",
-                  parts: [{ text: userPrompt }],
+                  text: systemInstruction,
                 },
               ],
+            },
 
-              generationConfig: {
-                temperature: 0.3,
-                responseMimeType: "application/json",
-                maxOutputTokens: 6000,
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: userPrompt,
+                  },
+                ],
               },
-            }),
-            cache: "no-store",
-            signal: AbortSignal.timeout(90000),
-          }
-        );
+            ],
 
-        const result = await response.json();
+            generationConfig: {
+              temperature: 0.3,
+              responseMimeType: "application/json",
+              maxOutputTokens: 6000,
+            },
+          }),
 
-        if (response.ok) {
-          const generatedText =
-            result?.candidates?.[0]?.content?.parts
-              ?.map((part) => part.text || "")
-              .join("");
+          cache: "no-store",
 
-          if (!generatedText) {
-            throw new Error(
-              "Gemini returned an empty analysis."
-            );
-          }
-
-          return {
-            generatedText,
-            usage: result.usageMetadata || null,
-            model,
-          };
+          signal: AbortSignal.timeout(90000),
         }
+      );
 
+      const result = await response.json();
+
+      if (!response.ok) {
         const message =
           result?.error?.message ||
           "Unknown Gemini API error.";
 
+        console.error("Gemini API error:", {
+          status: response.status,
+          message,
+          attempt,
+        });
+
         lastError = {
           status: response.status,
           message,
-          model,
         };
 
-        console.error("Gemini API error:", {
-          model,
-          attempt,
-          status: response.status,
-          message,
-        });
-
-        // Don't retry permanent errors such as invalid API key
         if (!isTemporaryError(response.status)) {
           throw new Error(
             `Gemini API error (${response.status}): ${message}`
           );
         }
 
-        // Retry with increasing wait time
-        if (attempt < 2) {
-          await wait(attempt * 2500);
-        }
-      } catch (error) {
-        if (
-          error.message?.startsWith("Gemini API error (")
-        ) {
-          throw error;
+        if (attempt < maxAttempts) {
+          const delay = attempt * 3000;
+
+          console.log(
+            `Retrying Gemini after ${delay}ms`
+          );
+
+          await wait(delay);
+          continue;
         }
 
-        lastError = {
-          status: 503,
-          message: error.message || "Network error",
-          model,
-        };
+        break;
+      }
 
-        console.error("Gemini request failed:", {
-          model,
-          attempt,
-          message: error.message,
-        });
+      const generatedText =
+        result?.candidates?.[0]?.content?.parts
+          ?.map((part) => part.text || "")
+          .join("");
 
-        if (attempt < 2) {
-          await wait(attempt * 2500);
-        }
+      if (!generatedText) {
+        throw new Error(
+          "Gemini did not generate an analysis. Check the API response and safety settings."
+        );
+      }
+
+      return {
+        generatedText,
+        usage: result.usageMetadata || null,
+        model,
+      };
+    } catch (error) {
+      if (
+        error.message?.startsWith("Gemini API error (")
+      ) {
+        throw error;
+      }
+
+      console.error(
+        `Gemini attempt ${attempt} failed:`,
+        error
+      );
+
+      lastError = {
+        status: 503,
+        message: error.message || "Network error",
+      };
+
+      if (attempt < maxAttempts) {
+        await wait(attempt * 3000);
       }
     }
-
-    console.warn(
-      `Model ${model} failed. Trying next model...`
-    );
   }
 
   throw new Error(
-    `All Gemini attempts failed. Last error: ${
+    `Gemini is temporarily unavailable. Last error: ${
       lastError?.message || "Unknown error"
     }`
   );
 }
 
+// ------------------------------
+// MAIN API
+// ------------------------------
+
 export async function POST(request) {
   try {
+    // Check API configuration
+
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (!geminiKey) {
@@ -286,13 +330,17 @@ export async function POST(request) {
       return Response.json(
         {
           success: false,
-          error: "Supabase server configuration is missing.",
+          error:
+            "Supabase server configuration is missing.",
         },
         { status: 500 }
       );
     }
 
-    // Authenticate user
+    // ------------------------------
+    // AUTHENTICATION
+    // ------------------------------
+
     const authorization =
       request.headers.get("authorization");
 
@@ -324,14 +372,19 @@ export async function POST(request) {
       );
     }
 
-    // Find connected YouTube channel
-    const { data: channels, error: channelError } =
-      await supabase
-        .from("channels")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("connection_status", "connected")
-        .limit(1);
+    // ------------------------------
+    // CONNECTED CHANNEL
+    // ------------------------------
+
+    const {
+      data: channels,
+      error: channelError,
+    } = await supabase
+      .from("channels")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("connection_status", "connected")
+      .limit(1);
 
     if (channelError) {
       throw new Error(
@@ -352,16 +405,23 @@ export async function POST(request) {
 
     const channel = channels[0];
 
-    // Fetch latest 30 videos
-    const { data: videos, error: videosError } =
-      await supabase
-        .from("videos")
-        .select(
-          "id,channel_id,youtube_video_id,title,description,views,likes,comments_count,retention,performance_data,created_at"
-        )
-        .eq("channel_id", channel.id)
-        .order("created_at", { ascending: false })
-        .limit(30);
+    // ------------------------------
+    // FETCH VIDEOS
+    // ------------------------------
+
+    const {
+      data: videos,
+      error: videosError,
+    } = await supabase
+      .from("videos")
+      .select(
+        "id,channel_id,youtube_video_id,title,description,views,likes,comments_count,retention,performance_data,created_at"
+      )
+      .eq("channel_id", channel.id)
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(30);
 
     if (videosError) {
       throw new Error(
@@ -382,7 +442,10 @@ export async function POST(request) {
 
     const preparedVideos = videos.map(prepareVideo);
 
-    // Calculate channel statistics
+    // ------------------------------
+    // CHANNEL STATISTICS
+    // ------------------------------
+
     const totalViews = preparedVideos.reduce(
       (sum, video) => sum + video.views,
       0
@@ -413,119 +476,197 @@ export async function POST(request) {
       totalViews,
       totalLikes,
       totalComments,
+
+      averageViews:
+        preparedVideos.length > 0
+          ? Math.round(
+              totalViews / preparedVideos.length
+            )
+          : 0,
     };
 
-    // AI instructions
+    // ------------------------------
+    // AI INSTRUCTIONS
+    // ------------------------------
+
     const systemInstruction = `
 You are CreatorOS, a professional YouTube Shorts analytics strategist.
 
 Your job is to analyze real YouTube channel performance data.
 
-IMPORTANT RULES:
+LANGUAGE RULES:
 
-1. Base every conclusion on the supplied data.
+1. Write all explanations in natural, easy-to-understand Bengali.
+2. Use standard Bengali script, not Banglish.
+3. Keep original YouTube video titles exactly as provided.
+4. Never translate video titles.
+5. Keep channel names, people's names, case names, and proper nouns unchanged.
+6. Keep technical analytics terms in English where translation could create confusion.
+
+Keep these terms in English:
+Views, Likes, Comments, Shares, Retention,
+Average View Percentage, Average View Duration,
+Watch Time, Subscribers Gained, Impressions,
+Traffic Sources, Viewed vs Swiped Away,
+YouTube Shorts, Hook, Storytelling, Engagement.
+
+7. Keep all JSON keys in English.
+8. Keep enum values in English.
+9. Do not write the entire report in English.
+10. Make the Bengali explanations understandable to beginners.
+
+ANALYSIS RULES:
+
+1. Base every conclusion on supplied data.
 2. Never invent metrics, events, audience behavior, or video details.
-3. Do not claim that you watched the actual videos.
-4. Do not claim to know their hooks, editing, visuals, scripts, or thumbnails because those are not supplied.
-5. Distinguish measured facts from possible explanations.
-6. If there is insufficient data, clearly say so.
+3. Never claim that you watched the actual videos.
+4. Never claim to know hooks, editing, visuals, scripts, or thumbnails because those are not supplied.
+5. Separate measured facts from possible explanations.
+6. If evidence is insufficient, clearly say so in Bengali.
 7. Average View Percentage is NOT the same as Viewed vs Swiped Away.
 8. A missing retention curve must not be treated as poor retention.
-9. Compare videos fairly, considering their views and available metrics.
-10. Provide practical advice specifically for YouTube Shorts.
-11. Write all explanations in clear English.
-12. Return ONLY valid JSON. Do not use Markdown or code fences.
+9. Compare videos fairly.
+10. Consider video age and available metrics when comparing performance.
+11. Do not conclude that a topic is bad based on only one underperforming video.
+12. Do not confuse correlation with causation.
+13. Low views alone do not prove a weak hook.
+14. Never invent traffic sources, audience demographics, or geographic data.
+15. Do not make unsupported claims about the YouTube algorithm.
+16. Give practical advice specifically for YouTube Shorts.
+17. Do not repeat the same generic recommendation for every video.
+18. If data is unavailable, write "তথ্য পাওয়া যায়নি".
+19. If supplied metrics conflict, mention the inconsistency in dataLimitations.
+20. Do not describe a video as viral unless supplied data supports that conclusion.
 
-Return this exact JSON structure:
+CONFIDENCE RULES:
+
+High:
+Multiple relevant metrics support the conclusion.
+
+Medium:
+Some evidence exists, but important information is missing.
+
+Low:
+The conclusion is uncertain or based on limited evidence.
+
+Explain the confidence level in Bengali.
+
+Return ONLY valid JSON.
+Do not use Markdown or code fences.
+
+RETURN THIS EXACT JSON STRUCTURE:
 
 {
   "overview": {
-    "summary": "Overall channel performance summary",
+    "summary": "বাংলায় সামগ্রিক চ্যানেল বিশ্লেষণ",
     "performanceLevel": "Growing, Stable, or Needs Improvement",
     "totalVideosAnalyzed": 0,
     "totalViews": 0,
     "averageViews": 0,
-    "keyFinding": "Most important finding"
+    "keyFinding": "বাংলায় সবচেয়ে গুরুত্বপূর্ণ পর্যবেক্ষণ",
+    "confidence": "High, Medium, or Low",
+    "confidenceReason": "বাংলায় প্রমাণের ব্যাখ্যা"
   },
   "strengths": [
-    "Evidence-based strength"
+    "বাংলায় তথ্যভিত্তিক শক্তির দিক"
   ],
   "weaknesses": [
-    "Evidence-based weakness"
+    "বাংলায় তথ্যভিত্তিক দুর্বলতার দিক"
   ],
   "topPerformers": [
     {
-      "title": "Video title",
+      "title": "Original video title",
       "views": 0,
-      "reason": "Why it performed well based on available metrics"
+      "reason": "বাংলায় তথ্যভিত্তিক ব্যাখ্যা",
+      "confidence": "High, Medium, or Low"
     }
   ],
   "underperformers": [
     {
-      "title": "Video title",
+      "title": "Original video title",
       "views": 0,
       "possibleIssues": [
-        "Possible issue"
+        "বাংলায় সম্ভাব্য সমস্যা"
       ],
-      "evidence": "Metric supporting this observation"
+      "evidence": "বাংলায় সংশ্লিষ্ট Metric-এর প্রমাণ",
+      "confidence": "High, Medium, or Low"
     }
   ],
   "videoInsights": [
     {
-      "title": "Video title",
-      "performance": "Short performance assessment",
+      "title": "Original video title",
+      "performance": "বাংলায় সংক্ষিপ্ত মূল্যায়ন",
       "strengths": [
-        "Strength"
+        "বাংলায় শক্তির দিক"
       ],
       "weaknesses": [
-        "Weakness"
+        "বাংলায় দুর্বলতার দিক"
       ],
       "retentionInsights": [
-        "Retention observation or insufficient data"
+        "বাংলায় Retention পর্যবেক্ষণ"
       ],
       "recommendations": [
-        "Actionable recommendation"
-      ]
+        "বাংলায় কার্যকর পরামর্শ"
+      ],
+      "confidence": "High, Medium, or Low"
     }
   ],
   "nextVideoStrategy": {
-    "recommendedApproach": "Recommended content direction",
-    "hookAdvice": "Hook recommendations",
-    "storytellingAdvice": "Storytelling recommendations",
-    "editingAdvice": "Editing recommendations based on performance data only",
-    "endingAdvice": "Ending and audience engagement recommendations"
+    "recommendedApproach": "বাংলায় পরবর্তী ভিডিওর কৌশল",
+    "hookAdvice": "বাংলায় Hook-এর পরামর্শ",
+    "storytellingAdvice": "বাংলায় Storytelling-এর পরামর্শ",
+    "editingAdvice": "বাংলায় Editing-এর পরামর্শ",
+    "endingAdvice": "বাংলায় Ending ও Engagement-এর পরামর্শ"
   },
   "actionPlan": [
     {
-      "priority": "High",
-      "task": "Specific task",
-      "reason": "Why this task matters"
+      "priority": "High, Medium, or Low",
+      "task": "বাংলায় নির্দিষ্ট করণীয়",
+      "reason": "বাংলায় কেন এটি গুরুত্বপূর্ণ"
     }
   ],
   "dataLimitations": [
-    "Mention missing metrics or information that limits this analysis"
+    "বাংলায় অনুপস্থিত তথ্য বা বিশ্লেষণের সীমাবদ্ধতা"
   ]
 }
 
-Keep the analysis useful and specific.
-Analyze no more than 10 individual videos in videoInsights.
-Use no more than 5 top performers and 5 underperformers.
-Use no more than 5 action plan items.
+LIMITS:
+
+- Analyze no more than 10 individual videos in videoInsights.
+- Use no more than 5 top performers.
+- Use no more than 5 underperformers.
+- Use no more than 5 action plan items.
+- Keep explanations concise but meaningful.
+- Never translate original video titles.
+- Do not fabricate missing information.
 `;
+
+    // ------------------------------
+    // USER PROMPT
+    // ------------------------------
 
     const userPrompt = `
 Analyze this YouTube channel using the following real database data.
 
 CHANNEL DATA:
+
 ${JSON.stringify(channelData, null, 2)}
 
 VIDEO PERFORMANCE DATA:
+
 ${JSON.stringify(preparedVideos, null, 2)}
 
+Important:
+Write all explanations in Bengali.
+Preserve original video titles and channel names.
+Keep technical analytics terminology in English.
 Return the complete JSON analysis now.
 `;
 
-    // Call Gemini with retry and fallback
+    // ------------------------------
+    // GEMINI API
+    // ------------------------------
+
     const geminiResult = await callGemini(
       systemInstruction,
       userPrompt,
@@ -536,7 +677,10 @@ Return the complete JSON analysis now.
       geminiResult.generatedText
     );
 
-    // Return analysis to dashboard
+    // ------------------------------
+    // FINAL RESPONSE
+    // ------------------------------
+
     return Response.json({
       success: true,
 
@@ -556,25 +700,31 @@ Return the complete JSON analysis now.
 
       usage: geminiResult.usage,
     });
-  } catch (error) {
-    console.error("AI analysis error:", error);
 
-    const message = error.message || "";
+  } catch (error) {
+    console.error(
+      "AI analysis error:",
+      error
+    );
+
+    const message =
+      error.message ||
+      "An unexpected error occurred during AI analysis.";
 
     const isTemporary =
       message.includes("503") ||
       message.includes("429") ||
       message.includes("overloaded") ||
       message.includes("high demand") ||
-      message.includes("All Gemini attempts failed");
+      message.includes("temporarily unavailable");
 
     return Response.json(
       {
         success: false,
+
         error: isTemporary
-          ? "Gemini is temporarily busy. We tried multiple attempts and backup models. Please try again shortly."
-          : message ||
-            "An unexpected error occurred during AI analysis.",
+          ? "Gemini সার্ভার বর্তমানে ব্যস্ত। একাধিকবার চেষ্টা করা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।"
+          : message,
       },
       {
         status: isTemporary ? 503 : 500,
