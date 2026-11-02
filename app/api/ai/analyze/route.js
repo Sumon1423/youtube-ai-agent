@@ -1,326 +1,480 @@
 
-import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
 
 function getAnalytics(video) {
-  const data = video.performance_data || {};
-  return data.analytics || data.youtubeAnalytics || data;
+  const performance = video?.performance_data || {};
+
+  return (
+    performance.analytics ||
+    performance.youtubeAnalytics ||
+    performance ||
+    {}
+  );
 }
 
-function getVideoData(video) {
-  const analytics = getAnalytics(video);
-
-  const retentionData =
-    analytics.audienceRetention ||
-    analytics.retentionCurve ||
-    analytics.retentionPoints ||
+function getRetention(video, analytics) {
+  const data =
+    analytics?.audienceRetention ||
+    analytics?.retentionCurve ||
+    analytics?.retentionPoints ||
+    analytics?.retention ||
+    video?.retention ||
     [];
 
-  const points = Array.isArray(retentionData)
-    ? retentionData
-    : retentionData.points || [];
+  if (Array.isArray(data)) return data;
+
+  if (Array.isArray(data?.points)) {
+    return data.points;
+  }
+
+  return [];
+}
+
+function safeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function prepareVideo(video) {
+  const analytics = getAnalytics(video);
+  const retention = getRetention(video, analytics);
 
   return {
+    id: video.id,
+    youtubeVideoId: video.youtube_video_id,
     title: video.title || "Untitled video",
     description: video.description || "",
-    views: Number(video.views || 0),
-    likes: Number(analytics.likes ?? video.likes ?? 0),
-    comments: Number(
-      analytics.comments ?? video.comments_count ?? 0
+    publishedAt: video.created_at,
+
+    views: safeNumber(
+      analytics?.views ?? video.views
     ),
-    shares: Number(analytics.shares || 0),
-    averageViewDurationSeconds: Number(
-      analytics.averageViewDurationSeconds ??
-      analytics.averageViewDuration ??
-      0
+
+    likes: safeNumber(
+      analytics?.likes ?? video.likes
     ),
-    averageViewPercentage:
-      analytics.averageViewPercentage == null
-        ? video.retention == null
-          ? null
-          : Number(video.retention)
-        : Number(analytics.averageViewPercentage),
-    watchTimeMinutes: Number(
-      analytics.watchTimeMinutes ??
-      analytics.estimatedMinutesWatched ??
-      0
+
+    comments: safeNumber(
+      analytics?.comments ??
+      analytics?.commentsCount ??
+      video.comments_count
     ),
-    subscribersGained: Number(
-      analytics.subscribersGained || 0
+
+    shares: safeNumber(
+      analytics?.shares
     ),
-    subscribersLost: Number(
-      analytics.subscribersLost || 0
+
+    averageViewDurationSeconds: safeNumber(
+      analytics?.averageViewDurationSeconds ??
+      analytics?.averageViewDuration
     ),
-    retentionCurve: points.slice(0, 80).map((point) => ({
-      time: Number(point.elapsedVideoTimeRatio ?? 0),
-      audienceWatchRatio:
-        point.audienceWatchRatio == null
-          ? null
-          : Number(point.audienceWatchRatio),
-      relativeRetentionPerformance:
-        point.relativeRetentionPerformance == null
-          ? null
-          : Number(point.relativeRetentionPerformance),
-    })),
-    analyticsDateRange: analytics.dateRange || null,
+
+    averageViewPercentage: safeNumber(
+      analytics?.averageViewPercentage
+    ),
+
+    watchTimeMinutes: safeNumber(
+      analytics?.watchTimeMinutes ??
+      analytics?.estimatedMinutesWatched
+    ),
+
+    subscribersGained: safeNumber(
+      analytics?.subscribersGained
+    ),
+
+    retentionPoints: retention.slice(0, 30),
   };
+}
+
+function extractJSON(text) {
+  if (!text) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  let cleaned = text.trim();
+
+  cleaned = cleaned
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "");
+
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+
+  if (start === -1 || end === -1) {
+    throw new Error("Gemini did not return valid JSON.");
+  }
+
+  return JSON.parse(cleaned.slice(start, end + 1));
 }
 
 export async function POST(request) {
   try {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // Check API keys and configuration
+    const geminiKey = process.env.GEMINI_API_KEY;
 
-    const supabaseKey =
-      process.env.SUPABASE_SECRET_KEY;
-
-    const openaiKey =
-      process.env.OPENAI_API_KEY;
-
-    if (!supabaseUrl || !supabaseKey || !openaiKey) {
-      return NextResponse.json(
-        { error: "Server configuration is incomplete." },
+    if (!geminiKey) {
+      return Response.json(
+        {
+          success: false,
+          error: "GEMINI_API_KEY is missing in Vercel Environment Variables.",
+        },
         { status: 500 }
       );
     }
 
-    // Authenticate the user.
-    const authorization =
-      request.headers.get("authorization");
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.SUPABASE_SECRET_KEY
+    ) {
+      return Response.json(
+        {
+          success: false,
+          error: "Supabase server configuration is missing.",
+        },
+        { status: 500 }
+      );
+    }
+
+    // Authenticate user
+    const authorization = request.headers.get("authorization");
 
     if (!authorization?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Authentication required." },
-        { status: 401 }
-      );
-    }
-
-    const token = authorization.slice(7);
-
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
+      return Response.json(
+        {
+          success: false,
+          error: "Authorization token is missing.",
         },
-      }
-    );
-
-    const { data: authData, error: authError } =
-      await supabase.auth.getUser(token);
-
-    if (authError || !authData?.user) {
-      return NextResponse.json(
-        { error: "Invalid login session." },
         { status: 401 }
       );
     }
 
-    const userId = authData.user.id;
+    const token = authorization.substring(7);
 
-    // Optional: analyze one selected video.
-    const body = await request.json().catch(() => ({}));
-    const selectedVideoId = body.videoId || null;
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
 
-    // Find the user's connected channel.
-    const { data: channel, error: channelError } =
-      await supabase
-        .from("channels")
-        .select("id, channel_name")
-        .eq("user_id", userId)
-        .eq("connection_status", "connected")
-        .limit(1)
-        .maybeSingle();
+    if (authError || !user) {
+      return Response.json(
+        {
+          success: false,
+          error: "Your login session is invalid or expired.",
+        },
+        { status: 401 }
+      );
+    }
 
-    if (channelError || !channel) {
-      return NextResponse.json(
-        { error: "No connected YouTube channel found." },
+    // Find connected YouTube channel
+    const { data: channels, error: channelError } = await supabase
+      .from("channels")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("connection_status", "connected")
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    if (channelError) {
+      throw new Error(
+        `Channel database error: ${channelError.message}`
+      );
+    }
+
+    if (!channels || channels.length === 0) {
+      return Response.json(
+        {
+          success: false,
+          error: "No connected YouTube channel found. Connect your channel first.",
+        },
         { status: 404 }
       );
     }
 
-    // Load only this user's channel videos.
-    let videoQuery = supabase
+    const channel = channels[0];
+
+    // Fetch latest 30 videos
+    const { data: videos, error: videosError } = await supabase
       .from("videos")
       .select(
-        "id,youtube_video_id,title,description,views,likes,comments_count,retention,performance_data,created_at"
+        "id,channel_id,youtube_video_id,title,description,views,likes,comments_count,retention,performance_data,created_at"
       )
       .eq("channel_id", channel.id)
       .order("created_at", { ascending: false })
       .limit(30);
 
-    if (selectedVideoId) {
-      videoQuery = videoQuery.eq("id", selectedVideoId);
-    }
-
-    const { data: videos, error: videosError } =
-      await videoQuery;
-
     if (videosError) {
-      throw new Error("Could not load video analytics.");
+      throw new Error(
+        `Video database error: ${videosError.message}`
+      );
     }
 
     if (!videos || videos.length === 0) {
-      return NextResponse.json(
-        { error: "No synced videos found." },
+      return Response.json(
+        {
+          success: false,
+          error: "No synced videos found. Sync your YouTube channel first.",
+        },
         { status: 404 }
       );
     }
 
-    const videoData = videos.map(getVideoData);
+    const preparedVideos = videos.map(prepareVideo);
 
-    // Ask OpenAI to analyze the real metrics.
-    const prompt = `
-Analyze the following YouTube Shorts performance data.
+    // Calculate basic channel statistics
+    const totalViews = preparedVideos.reduce(
+      (sum, video) => sum + video.views,
+      0
+    );
 
-Channel: ${channel.channel_name || "YouTube Channel"}
+    const totalLikes = preparedVideos.reduce(
+      (sum, video) => sum + video.likes,
+      0
+    );
+
+    const totalComments = preparedVideos.reduce(
+      (sum, video) => sum + video.comments,
+      0
+    );
+
+    const channelData = {
+      channelName:
+        channel.channel_name ||
+        channel.title ||
+        channel.name ||
+        "YouTube Channel",
+
+      subscriberCount: safeNumber(
+        channel.subscriber_count
+      ),
+
+      videosAnalyzed: preparedVideos.length,
+      totalViews,
+      totalLikes,
+      totalComments,
+    };
+
+    // AI instructions
+    const systemInstruction = `
+You are CreatorOS, a professional YouTube Shorts analytics strategist.
+
+Your job is to analyze real YouTube channel performance data.
 
 IMPORTANT RULES:
-- Use only the supplied data.
-- Never invent metrics, audience behavior, or causes.
-- Clearly distinguish measured facts from hypotheses.
-- Do not claim to know the actual opening hook, editing,
-  script, visuals, or ending because video footage and
-  transcripts have not been provided.
-- Average View Percentage is NOT Viewed vs. Swiped Away.
-- A missing metric must be reported as unavailable.
-- Compare videos carefully. Avoid conclusions based only
-  on raw views when video ages or exposure differ.
-- Give practical recommendations for future Shorts.
-- Return valid JSON only.
 
-Analyze these videos:
-${JSON.stringify(videoData)}
+1. Base every conclusion on the supplied data.
+2. Never invent metrics, events, audience behavior, or video details.
+3. Do not claim that you watched the actual videos.
+4. Do not claim to know their hooks, editing, visuals, scripts, or thumbnails because those are not supplied.
+5. Distinguish measured facts from possible explanations.
+6. If there is insufficient data, clearly say so.
+7. Average View Percentage is NOT the same as Viewed vs Swiped Away.
+8. A missing retention curve must not be treated as poor retention.
+9. Compare videos fairly, considering their views and available metrics.
+10. Provide practical advice specifically for YouTube Shorts.
+11. Write all explanations in clear English.
+12. Return ONLY valid JSON. Do not use Markdown or code fences.
 
-Return this JSON structure:
+Return this exact JSON structure:
 
 {
-  "overview": "Short channel performance summary",
-  "overallStrengths": ["strength 1"],
-  "overallWeaknesses": ["weakness 1"],
+  "overview": {
+    "summary": "Overall channel performance summary",
+    "performanceLevel": "Growing, Stable, or Needs Improvement",
+    "totalVideosAnalyzed": 0,
+    "totalViews": 0,
+    "averageViews": 0,
+    "keyFinding": "Most important finding"
+  },
+  "strengths": [
+    "Evidence-based strength"
+  ],
+  "weaknesses": [
+    "Evidence-based weakness"
+  ],
   "topPerformers": [
     {
       "title": "Video title",
-      "reason": "Evidence-based explanation"
+      "views": 0,
+      "reason": "Why it performed well based on available metrics"
     }
   ],
   "underperformers": [
     {
       "title": "Video title",
-      "possibleIssues": ["issue"],
-      "evidence": ["metric or observation"]
+      "views": 0,
+      "possibleIssues": [
+        "Possible issue"
+      ],
+      "evidence": "Metric supporting this observation"
     }
   ],
   "videoInsights": [
     {
       "title": "Video title",
-      "performance": "Strong, Average, or Weak",
-      "strengths": ["strength"],
-      "weaknesses": ["weakness"],
-      "retentionInsights": ["observation"],
-      "recommendations": ["actionable recommendation"]
+      "performance": "Short performance assessment",
+      "strengths": [
+        "Strength"
+      ],
+      "weaknesses": [
+        "Weakness"
+      ],
+      "retentionInsights": [
+        "Retention observation or insufficient data"
+      ],
+      "recommendations": [
+        "Actionable recommendation"
+      ]
     }
   ],
   "nextVideoStrategy": {
-    "recommendedApproach": "Recommended content approach",
-    "hookAdvice": "Advice for testing future hooks",
-    "storytellingAdvice": "Storytelling recommendation",
-    "editingAdvice": "Editing recommendation",
-    "endingAdvice": "Ending recommendation"
+    "recommendedApproach": "Recommended content direction",
+    "hookAdvice": "Hook recommendations",
+    "storytellingAdvice": "Storytelling recommendations",
+    "editingAdvice": "Editing recommendations based on performance data only",
+    "endingAdvice": "Ending and audience engagement recommendations"
   },
   "actionPlan": [
     {
       "priority": "High",
       "task": "Specific task",
-      "reason": "Why this matters"
+      "reason": "Why this task matters"
     }
   ],
-  "dataLimitations": ["Missing or insufficient data"]
+  "dataLimitations": [
+    "Mention missing metrics or information that limits this analysis"
+  ]
 }
+
+Keep the analysis useful and specific.
+Analyze no more than 10 individual videos in videoInsights.
+Use no more than 5 top performers and 5 underperformers.
+Use no more than 5 action plan items.
 `;
 
-    const aiResponse = await fetch(
-      "https://api.openai.com/v1/chat/completions",
+    const userPrompt = `
+Analyze this YouTube channel using the following real database data.
+
+CHANNEL DATA:
+${JSON.stringify(channelData, null, 2)}
+
+VIDEO PERFORMANCE DATA:
+${JSON.stringify(preparedVideos, null, 2)}
+
+Return the complete JSON analysis now.
+`;
+
+    // Call Google Gemini API
+    const geminiResponse = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${openaiKey}`,
           "Content-Type": "application/json",
+          "x-goog-api-key": geminiKey,
         },
         body: JSON.stringify({
-          model: "gpt-4.1-mini",
-          messages: [
-            {
-              role: "developer",
-              content:
-                "You are a careful YouTube Shorts analytics specialist. Never fabricate evidence. Return valid JSON only.",
-            },
+          systemInstruction: {
+            parts: [
+              {
+                text: systemInstruction,
+              },
+            ],
+          },
+
+          contents: [
             {
               role: "user",
-              content: prompt,
+              parts: [
+                {
+                  text: userPrompt,
+                },
+              ],
             },
           ],
-          response_format: {
-            type: "json_object",
+
+          generationConfig: {
+            temperature: 0.3,
+            responseMimeType: "application/json",
+            maxOutputTokens: 6000,
           },
-          temperature: 0.3,
-          max_tokens: 3000,
         }),
         cache: "no-store",
       }
     );
 
-    const aiResult = await aiResponse.json();
+    const geminiResult = await geminiResponse.json();
 
-    if (!aiResponse.ok) {
-      console.error("OpenAI API error:", aiResult);
+    if (!geminiResponse.ok) {
+      const apiMessage =
+        geminiResult?.error?.message ||
+        "Unknown Gemini API error.";
 
-      throw new Error(
-        aiResult.error?.message ||
-        "AI analysis request failed."
+      console.error("Gemini API error:", geminiResult);
+
+      return Response.json(
+        {
+          success: false,
+          error: `Gemini API error: ${apiMessage}`,
+        },
+        { status: geminiResponse.status }
       );
     }
 
-    const content =
-      aiResult.choices?.[0]?.message?.content;
+    const generatedText =
+      geminiResult?.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text || "")
+        .join("");
 
-    if (!content) {
-      throw new Error("AI returned an empty response.");
+    if (!generatedText) {
+      throw new Error(
+        "Gemini did not generate an analysis. Check the API response and safety settings."
+      );
     }
 
-    let analysis;
+    const analysis = extractJSON(generatedText);
 
-    try {
-      analysis = JSON.parse(content);
-    } catch {
-      throw new Error("AI returned invalid JSON.");
-    }
-
-    return NextResponse.json({
+    // Return analysis to dashboard
+    return Response.json({
       success: true,
-      channel: channel.channel_name,
-      videosAnalyzed: videos.length,
+
+      provider: "Google Gemini",
+
+      channel: {
+        id: channel.id,
+        name: channelData.channelName,
+        subscriberCount: channelData.subscriberCount,
+      },
+
+      videosAnalyzed: preparedVideos.length,
+
       analysis,
-      usage: aiResult.usage || null,
+
+      usage: geminiResult.usageMetadata || null,
     });
-
   } catch (error) {
-    console.error(
-      "AI Performance Analysis error:",
-      error.message
-    );
+    console.error("AI analysis error:", error);
 
-    return NextResponse.json(
+    return Response.json(
       {
         success: false,
         error:
           error.message ||
-          "AI performance analysis failed.",
+          "An unexpected error occurred during AI analysis.",
       },
       { status: 500 }
     );
