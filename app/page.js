@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -590,263 +589,188 @@ export default function Home() {
   }
 
   // AI Report
+  function renderAIReport() {
+    if (!aiReport?.analysis) return null;
 
-function renderAIReport() {
-  if (!aiReport?.analysis) return null;
+    const analysis = aiReport.analysis;
 
-  const analysis = aiReport.analysis;
+    const overview =
+      typeof analysis.overview === "object" &&
+      analysis.overview !== null
+        ? analysis.overview
+        : { summary: analysis.overview || "No summary available." };
 
-  const overview =
-    typeof analysis.overview === "object" &&
-    analysis.overview !== null
-      ? analysis.overview
-      : { summary: analysis.overview || "No summary available." };
+    const list = (items, prefix) => {
+      if (!Array.isArray(items) || items.length === 0) {
+        return <p className="report-muted">No information available.</p>;
+      }
 
-  const list = (items, prefix) => {
-    if (!Array.isArray(items) || items.length === 0) {
-      return <p className="report-muted">No information available.</p>;
-    }
-
-    return items.map((item, index) => (
-      <div className="report-item" key={`${prefix}-${index}`}>
-        {typeof item === "string" ? item : JSON.stringify(item)}
-      </div>
-    ));
-  };
-
-  const performers = Array.isArray(analysis.topPerformers)
-    ? analysis.topPerformers
-    : [];
-
-  const underperformers = Array.isArray(analysis.underperformers)
-    ? analysis.underperformers
-    : [];
-
-  const insights = Array.isArray(analysis.videoInsights)
-    ? analysis.videoInsights
-    : [];
-
-  const actions = Array.isArray(analysis.actionPlan)
-    ? analysis.actionPlan
-    : [];
-
-  const strategy = analysis.nextVideoStrategy || {};
-
-  return (
-    <div className="performance-panel ai-report">
-      <div className="performance-title">
-        <div>
-          <span className="eyebrow">AI PERFORMANCE INTELLIGENCE</span>
-          <h3>Channel Analysis Report</h3>
+      return items.map((item, index) => (
+        <div className="report-item" key={`${prefix}-${index}`}>
+          {typeof item === "string" ? item : JSON.stringify(item)}
         </div>
-        <Status value="Completed" />
-      </div>
+      ));
+    };
 
-      <p className="report-overview">
-        {overview.summary || "Analysis completed."}
-      </p>
+    const performers = Array.isArray(analysis.topPerformers)
+      ? analysis.topPerformers
+      : [];
 
-      <div className="metric-grid">
-        <div className="metric-tile">
-          <strong>{overview.performanceLevel || "—"}</strong>
-          <span>Performance Level</span>
+    const underperformers = Array.isArray(analysis.underperformers)
+      ? analysis.underperformers
+      : [];
+
+    const insights = Array.isArray(analysis.videoInsights)
+      ? analysis.videoInsights
+      : [];
+
+    const actions = Array.isArray(analysis.actionPlan)
+      ? analysis.actionPlan
+      : [];
+
+    const strategy = analysis.nextVideoStrategy || {};
+
+    return (
+      <div className="performance-panel ai-report">
+        <div className="performance-title">
+          <div>
+            <span className="eyebrow">AI PERFORMANCE INTELLIGENCE</span>
+            <h3>Channel Analysis Report</h3>
+          </div>
+          <Status value="Completed" />
         </div>
-        <div className="metric-tile">
-          <strong>{formatNumber(overview.totalViews)}</strong>
-          <span>Total Views</span>
+
+        <p className="report-overview">
+          {overview.summary || "Analysis completed."}
+        </p>
+
+        <div className="metric-grid">
+          <div className="metric-tile">
+            <strong>{overview.performanceLevel || "—"}</strong>
+            <span>Performance Level</span>
+          </div>
+
+          <div className="metric-tile">
+            <strong>{formatNumber(overview.totalViews)}</strong>
+            <span>Total Views</span>
+          </div>
+
+          <div className="metric-tile">
+            <strong>{formatNumber(overview.averageViews)}</strong>
+            <span>Average Views</span>
+          </div>
+
+          <div className="metric-tile">
+            <strong>
+              {aiReport.videosAnalyzed ||
+                overview.totalVideosAnalyzed ||
+                0}
+            </strong>
+            <span>Videos Analyzed</span>
+          </div>
         </div>
-        <div className="metric-tile">
-          <strong>{formatNumber(overview.averageViews)}</strong>
-          <span>Average Views</span>
+
+        <Section title="Key Finding" />
+        <div className="report-card">
+          <p>{overview.keyFinding || "No key finding available."}</p>
         </div>
-        <div className="metric-tile">
-          <strong>{aiReport.videosAnalyzed || overview.totalVideosAnalyzed || 0}</strong>
-          <span>Videos Analyzed</span>
-        </div>
-      </div>
 
-      <Section title="Key Finding" />
-      <div className="report-card">
-        <p>{overview.keyFinding || "No key finding available."}</p>
-      </div>
+        <Section title="Overall Strengths" />
+        {list(analysis.strengths || analysis.overallStrengths, "strength")}
 
-      <Section title="Overall Strengths" />
-      {list(analysis.strengths || analysis.overallStrengths, "strength")}
+        <Section title="Overall Weaknesses" />
+        {list(analysis.weaknesses || analysis.overallWeaknesses, "weakness")}
 
-      <Section title="Overall Weaknesses" />
-      {list(analysis.weaknesses || analysis.overallWeaknesses, "weakness")}
-
-      <Section title="Top Performers" />
-      {performers.length === 0 ? (
-        <p className="report-muted">No top performers identified.</p>
-      ) : (
-        performers.map((item, index) => (
-          <div className="report-card" key={`top-${index}`}>
-            <h4>{item.title || "Untitled video"}</h4>
-            <p>{item.reason || "No explanation available."}</p>
-            <p>Views: {formatNumber(item.views)}</p>
-          </div>
-        ))
-      )}
-
-      <Section title="Underperformers" />
-      {underperformers.length === 0 ? (
-        <p className="report-muted">No underperformers identified.</p>
-      ) : (
-        underperformers.map((item, index) => (
-          <div className="report-card" key={`under-${index}`}>
-            <h4>{item.title || "Untitled video"}</h4>
-            <p>Views: {formatNumber(item.views)}</p>
-            <strong>Evidence</strong>
-            <p>
-              {typeof item.evidence === "string"
-                ? item.evidence
-                : "No evidence available."}
-            </p>
-            <strong>Possible Issues</strong>
-            {list(item.possibleIssues, `issue-${index}`)}
-          </div>
-        ))
-      )}
-
-      <Section title="Video Insights" />
-      {insights.length === 0 ? (
-        <p className="report-muted">No individual video insights available.</p>
-      ) : (
-        insights.map((item, index) => (
-          <div className="report-card" key={`insight-${index}`}>
-            <h4>{item.title || "Untitled video"}</h4>
-            <p>{item.performance || "No performance assessment."}</p>
-
-            <strong>Strengths</strong>
-            {list(item.strengths, `video-strength-${index}`)}
-
-            <strong>Weaknesses</strong>
-            {list(item.weaknesses, `video-weakness-${index}`)}
-
-            <strong>Retention Insights</strong>
-            {list(item.retentionInsights, `retention-${index}`)}
-
-            <strong>Recommendations</strong>
-            {list(item.recommendations, `recommendation-${index}`)}
-          </div>
-        ))
-      )}
-
-      <Section title="Next Video Strategy" />
-      <div className="report-card">
-        {Object.entries(strategy).map(([key, value]) => (
-          <div className="strategy-item" key={key}>
-            <strong>{key.replace(/([A-Z])/g, " $1")}</strong>
-            <p>
-              {typeof value === "string"
-                ? value
-                : JSON.stringify(value)}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <Section title="Action Plan" />
-      {actions.length === 0 ? (
-        <p className="report-muted">No action plan available.</p>
-      ) : (
-        actions.map((item, index) => (
-          <div className="report-card" key={`action-${index}`}>
-            <Status value={item.priority || "Normal"} />
-            <h4>{item.task || "Recommended action"}</h4>
-            <p>{item.reason || ""}</p>
-          </div>
-        ))
-      )}
-
-      <Section title="Data Limitations" />
-      {list(analysis.dataLimitations, "limitation")}
-
-      <button
-        className="sync-button report-refresh"
-        onClick={handleAIAnalysis}
-        disabled={aiAnalyzing}
-      >
-        {aiAnalyzing ? "Analyzing..." : "Run Analysis Again ↻"}
-      </button>
-    </div>
-  );
-}
-
+        <Section title="Top Performers" />
+        {performers.length === 0 ? (
+          <p className="report-muted">No top performers identified.</p>
+        ) : (
+          performers.map((item, index) => (
+            <div className="report-card" key={`top-${index}`}>
+              <h4>{item.title || "Untitled video"}</h4>
+              <p>{item.reason || "No explanation available."}</p>
+              <p>Views: {formatNumber(item.views)}</p>
+            </div>
+          ))
+        )}
 
         <Section title="Underperformers" />
-
-        {(analysis.underperformers || []).length === 0 ? (
+        {underperformers.length === 0 ? (
           <p className="report-muted">No underperformers identified.</p>
         ) : (
-          analysis.underperformers.map((item, index) => (
+          underperformers.map((item, index) => (
             <div className="report-card" key={`under-${index}`}>
-              <h4>{item.title}</h4>
+              <h4>{item.title || "Untitled video"}</h4>
+              <p>Views: {formatNumber(item.views)}</p>
 
               <strong>Evidence</strong>
-              {renderReportList(item.evidence, `evidence-${index}`)}
+              <p>
+                {typeof item.evidence === "string"
+                  ? item.evidence
+                  : "No evidence available."}
+              </p>
 
               <strong>Possible Issues</strong>
-              {renderReportList(item.possibleIssues, `issue-${index}`)}
+              {list(item.possibleIssues, `issue-${index}`)}
             </div>
           ))
         )}
 
         <Section title="Video Insights" />
+        {insights.length === 0 ? (
+          <p className="report-muted">
+            No individual video insights available.
+          </p>
+        ) : (
+          insights.map((item, index) => (
+            <div className="report-card" key={`insight-${index}`}>
+              <h4>{item.title || "Untitled video"}</h4>
+              <p>{item.performance || "No performance assessment."}</p>
 
-        {(analysis.videoInsights || []).map((item, index) => (
-          <div className="report-card" key={`insight-${index}`}>
-            <h4>{item.title}</h4>
-            <Status value={item.performance} />
+              <strong>Strengths</strong>
+              {list(item.strengths, `video-strength-${index}`)}
 
-            <strong>Strengths</strong>
-            {renderReportList(item.strengths, `video-strength-${index}`)}
+              <strong>Weaknesses</strong>
+              {list(item.weaknesses, `video-weakness-${index}`)}
 
-            <strong>Weaknesses</strong>
-            {renderReportList(item.weaknesses, `video-weakness-${index}`)}
+              <strong>Retention Insights</strong>
+              {list(item.retentionInsights, `retention-${index}`)}
 
-            <strong>Retention Insights</strong>
-            {renderReportList(
-              item.retentionInsights,
-              `retention-${index}`
-            )}
-
-            <strong>Recommendations</strong>
-            {renderReportList(
-              item.recommendations,
-              `recommendation-${index}`
-            )}
-          </div>
-        ))}
+              <strong>Recommendations</strong>
+              {list(item.recommendations, `recommendation-${index}`)}
+            </div>
+          ))
+        )}
 
         <Section title="Next Video Strategy" />
-
         <div className="report-card">
-          {Object.entries(analysis.nextVideoStrategy || {}).map(
-            ([key, value]) => (
-              <div className="strategy-item" key={key}>
-                <strong>
-                  {key.replace(/([A-Z])/g, " $1")}
-                </strong>
-                <p>{value}</p>
-              </div>
-            )
-          )}
+          {Object.entries(strategy).map(([key, value]) => (
+            <div className="strategy-item" key={key}>
+              <strong>{key.replace(/([A-Z])/g, " $1")}</strong>
+              <p>
+                {typeof value === "string"
+                  ? value
+                  : JSON.stringify(value)}
+              </p>
+            </div>
+          ))}
         </div>
 
         <Section title="Action Plan" />
-
-        {(analysis.actionPlan || []).map((item, index) => (
-          <div className="report-card" key={`action-${index}`}>
-            <Status value={item.priority} />
-            <h4>{item.task}</h4>
-            <p>{item.reason}</p>
-          </div>
-        ))}
+        {actions.length === 0 ? (
+          <p className="report-muted">No action plan available.</p>
+        ) : (
+          actions.map((item, index) => (
+            <div className="report-card" key={`action-${index}`}>
+              <Status value={item.priority || "Normal"} />
+              <h4>{item.task || "Recommended action"}</h4>
+              <p>{item.reason || ""}</p>
+            </div>
+          ))
+        )}
 
         <Section title="Data Limitations" />
-        {renderReportList(analysis.dataLimitations, "limitation")}
+        {list(analysis.dataLimitations, "limitation")}
 
         <button
           className="sync-button report-refresh"
@@ -1001,9 +925,7 @@ function renderAIReport() {
               </div>
             )}
 
-            {aiError && (
-              <div className="error-box">{aiError}</div>
-            )}
+            {aiError && <div className="error-box">{aiError}</div>}
           </div>
         )}
 
