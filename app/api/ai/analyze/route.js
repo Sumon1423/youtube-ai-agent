@@ -74,9 +74,7 @@ function prepareVideo(video) {
       video.comments_count
     ),
 
-    shares: safeNumber(
-      analytics?.shares
-    ),
+    shares: safeNumber(analytics?.shares),
 
     averageViewDurationSeconds: safeNumber(
       analytics?.averageViewDurationSeconds ??
@@ -122,16 +120,160 @@ function extractJSON(text) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
+// Wait helper
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Identify temporary API errors
+function isTemporaryError(status) {
+  return [408, 429, 500, 502, 503, 504].includes(status);
+}
+
+// Retry Gemini and use a fallback model if necessary
+async function callGemini(systemInstruction, userPrompt, apiKey) {
+  const models = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
+  ];
+
+  let lastError = null;
+
+  for (const model of models) {
+    // Two attempts per model
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(
+          `Trying Gemini model: ${model}, attempt: ${attempt}`
+        );
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: systemInstruction }],
+              },
+
+              contents: [
+                {
+                  role: "user",
+                  parts: [{ text: userPrompt }],
+                },
+              ],
+
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: "application/json",
+                maxOutputTokens: 6000,
+              },
+            }),
+            cache: "no-store",
+            signal: AbortSignal.timeout(90000),
+          }
+        );
+
+        const result = await response.json();
+
+        if (response.ok) {
+          const generatedText =
+            result?.candidates?.[0]?.content?.parts
+              ?.map((part) => part.text || "")
+              .join("");
+
+          if (!generatedText) {
+            throw new Error(
+              "Gemini returned an empty analysis."
+            );
+          }
+
+          return {
+            generatedText,
+            usage: result.usageMetadata || null,
+            model,
+          };
+        }
+
+        const message =
+          result?.error?.message ||
+          "Unknown Gemini API error.";
+
+        lastError = {
+          status: response.status,
+          message,
+          model,
+        };
+
+        console.error("Gemini API error:", {
+          model,
+          attempt,
+          status: response.status,
+          message,
+        });
+
+        // Don't retry permanent errors such as invalid API key
+        if (!isTemporaryError(response.status)) {
+          throw new Error(
+            `Gemini API error (${response.status}): ${message}`
+          );
+        }
+
+        // Retry with increasing wait time
+        if (attempt < 2) {
+          await wait(attempt * 2500);
+        }
+      } catch (error) {
+        if (
+          error.message?.startsWith("Gemini API error (")
+        ) {
+          throw error;
+        }
+
+        lastError = {
+          status: 503,
+          message: error.message || "Network error",
+          model,
+        };
+
+        console.error("Gemini request failed:", {
+          model,
+          attempt,
+          message: error.message,
+        });
+
+        if (attempt < 2) {
+          await wait(attempt * 2500);
+        }
+      }
+    }
+
+    console.warn(
+      `Model ${model} failed. Trying next model...`
+    );
+  }
+
+  throw new Error(
+    `All Gemini attempts failed. Last error: ${
+      lastError?.message || "Unknown error"
+    }`
+  );
+}
+
 export async function POST(request) {
   try {
-    // Check API keys and configuration
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (!geminiKey) {
       return Response.json(
         {
           success: false,
-          error: "GEMINI_API_KEY is missing in Vercel Environment Variables.",
+          error:
+            "GEMINI_API_KEY is missing in Vercel Environment Variables.",
         },
         { status: 500 }
       );
@@ -151,7 +293,8 @@ export async function POST(request) {
     }
 
     // Authenticate user
-    const authorization = request.headers.get("authorization");
+    const authorization =
+      request.headers.get("authorization");
 
     if (!authorization?.startsWith("Bearer ")) {
       return Response.json(
@@ -174,19 +317,21 @@ export async function POST(request) {
       return Response.json(
         {
           success: false,
-          error: "Your login session is invalid or expired.",
+          error:
+            "Your login session is invalid or expired.",
         },
         { status: 401 }
       );
     }
 
     // Find connected YouTube channel
-    const { data: channels, error: channelError } = await supabase
-  .from("channels")
-  .select("*")
-  .eq("user_id", user.id)
-  .eq("connection_status", "connected")
-  .limit(1);
+    const { data: channels, error: channelError } =
+      await supabase
+        .from("channels")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("connection_status", "connected")
+        .limit(1);
 
     if (channelError) {
       throw new Error(
@@ -198,7 +343,8 @@ export async function POST(request) {
       return Response.json(
         {
           success: false,
-          error: "No connected YouTube channel found. Connect your channel first.",
+          error:
+            "No connected YouTube channel found. Connect your channel first.",
         },
         { status: 404 }
       );
@@ -207,14 +353,15 @@ export async function POST(request) {
     const channel = channels[0];
 
     // Fetch latest 30 videos
-    const { data: videos, error: videosError } = await supabase
-      .from("videos")
-      .select(
-        "id,channel_id,youtube_video_id,title,description,views,likes,comments_count,retention,performance_data,created_at"
-      )
-      .eq("channel_id", channel.id)
-      .order("created_at", { ascending: false })
-      .limit(30);
+    const { data: videos, error: videosError } =
+      await supabase
+        .from("videos")
+        .select(
+          "id,channel_id,youtube_video_id,title,description,views,likes,comments_count,retention,performance_data,created_at"
+        )
+        .eq("channel_id", channel.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
 
     if (videosError) {
       throw new Error(
@@ -226,7 +373,8 @@ export async function POST(request) {
       return Response.json(
         {
           success: false,
-          error: "No synced videos found. Sync your YouTube channel first.",
+          error:
+            "No synced videos found. Sync your YouTube channel first.",
         },
         { status: 404 }
       );
@@ -234,7 +382,7 @@ export async function POST(request) {
 
     const preparedVideos = videos.map(prepareVideo);
 
-    // Calculate basic channel statistics
+    // Calculate channel statistics
     const totalViews = preparedVideos.reduce(
       (sum, video) => sum + video.views,
       0
@@ -377,81 +525,24 @@ ${JSON.stringify(preparedVideos, null, 2)}
 Return the complete JSON analysis now.
 `;
 
-    // Call Google Gemini API
-    const geminiResponse = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": geminiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text: systemInstruction,
-              },
-            ],
-          },
-
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: userPrompt,
-                },
-              ],
-            },
-          ],
-
-          generationConfig: {
-            temperature: 0.3,
-            responseMimeType: "application/json",
-            maxOutputTokens: 6000,
-          },
-        }),
-        cache: "no-store",
-      }
+    // Call Gemini with retry and fallback
+    const geminiResult = await callGemini(
+      systemInstruction,
+      userPrompt,
+      geminiKey
     );
 
-    const geminiResult = await geminiResponse.json();
-
-    if (!geminiResponse.ok) {
-      const apiMessage =
-        geminiResult?.error?.message ||
-        "Unknown Gemini API error.";
-
-      console.error("Gemini API error:", geminiResult);
-
-      return Response.json(
-        {
-          success: false,
-          error: `Gemini API error: ${apiMessage}`,
-        },
-        { status: geminiResponse.status }
-      );
-    }
-
-    const generatedText =
-      geminiResult?.candidates?.[0]?.content?.parts
-        ?.map((part) => part.text || "")
-        .join("");
-
-    if (!generatedText) {
-      throw new Error(
-        "Gemini did not generate an analysis. Check the API response and safety settings."
-      );
-    }
-
-    const analysis = extractJSON(generatedText);
+    const analysis = extractJSON(
+      geminiResult.generatedText
+    );
 
     // Return analysis to dashboard
     return Response.json({
       success: true,
 
       provider: "Google Gemini",
+
+      model: geminiResult.model,
 
       channel: {
         id: channel.id,
@@ -463,19 +554,31 @@ Return the complete JSON analysis now.
 
       analysis,
 
-      usage: geminiResult.usageMetadata || null,
+      usage: geminiResult.usage,
     });
   } catch (error) {
     console.error("AI analysis error:", error);
 
+    const message = error.message || "";
+
+    const isTemporary =
+      message.includes("503") ||
+      message.includes("429") ||
+      message.includes("overloaded") ||
+      message.includes("high demand") ||
+      message.includes("All Gemini attempts failed");
+
     return Response.json(
       {
         success: false,
-        error:
-          error.message ||
-          "An unexpected error occurred during AI analysis.",
+        error: isTemporary
+          ? "Gemini is temporarily busy. We tried multiple attempts and backup models. Please try again shortly."
+          : message ||
+            "An unexpected error occurred during AI analysis.",
       },
-      { status: 500 }
+      {
+        status: isTemporary ? 503 : 500,
+      }
     );
   }
 }
