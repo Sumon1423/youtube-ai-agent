@@ -182,12 +182,11 @@ export async function POST(request) {
 
     // Find connected YouTube channel
     const { data: channels, error: channelError } = await supabase
-      .from("channels")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("connection_status", "connected")
-      .order("updated_at", { ascending: false })
-      .limit(1);
+  .from("channels")
+  .select("*")
+  .eq("user_id", user.id)
+  .eq("connection_status", "connected")
+  .limit(1);
 
     if (channelError) {
       throw new Error(
