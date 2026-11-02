@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -37,15 +38,15 @@ function Status({ value }) {
 
   let className = "waiting";
 
-  if (["connected", "completed", "approved"].includes(status)) {
+  if (["connected", "completed", "approved", "strong"].includes(status)) {
     className = "success";
   }
 
-  if (["running", "processing"].includes(status)) {
+  if (["running", "processing", "average"].includes(status)) {
     className = "running";
   }
 
-  if (["failed", "rejected"].includes(status)) {
+  if (["failed", "rejected", "weak", "high"].includes(status)) {
     className = "danger";
   }
 
@@ -77,6 +78,10 @@ export default function Home() {
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [analyticsSyncing, setAnalyticsSyncing] = useState(false);
+
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiReport, setAiReport] = useState(null);
+  const [aiError, setAiError] = useState("");
 
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("success");
@@ -347,7 +352,7 @@ export default function Home() {
     }
   }
 
-  // Sync YouTube Analytics and audience-retention data
+  // Sync YouTube Analytics
   async function handleAnalyticsSync() {
     if (analyticsSyncing) return;
 
@@ -405,6 +410,56 @@ export default function Home() {
     }
   }
 
+  // AI Performance Analysis
+  async function handleAIAnalysis() {
+    if (aiAnalyzing) return;
+
+    setAiAnalyzing(true);
+    setAiError("");
+    setAiReport(null);
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error || !data.session?.access_token) {
+        throw new Error("Login session expired. Please log in again.");
+      }
+
+      const response = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+        cache: "no-store",
+      });
+
+      const rawResponse = await response.text();
+      let result;
+
+      try {
+        result = JSON.parse(rawResponse);
+      } catch {
+        throw new Error(
+          `AI API returned a non-JSON response. HTTP ${response.status}. ${rawResponse.slice(0, 300)}`
+        );
+      }
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error || `AI analysis failed (HTTP ${response.status}).`
+        );
+      }
+
+      setAiReport(result);
+    } catch (error) {
+      setAiError(error.message || "AI analysis failed.");
+    } finally {
+      setAiAnalyzing(false);
+    }
+  }
+
   // Logout
   async function handleLogout() {
     const { error } = await supabase.auth.signOut();
@@ -451,7 +506,6 @@ export default function Home() {
 
   function getVideoAnalytics(video) {
     const root = video?.performance_data || {};
-
     return root.analytics || root.youtubeAnalytics || root;
   }
 
@@ -491,15 +545,17 @@ export default function Home() {
     return minutes ? `${minutes}m ${remaining}s` : `${remaining}s`;
   }
 
+  // Fixed retention mapping
   function getRetentionPoints(video) {
     const analytics = getVideoAnalytics(video);
+    const retentionData = analytics?.audienceRetention;
 
     const curve =
       analytics?.retentionCurve ||
       analytics?.retentionPoints ||
-      analytics?.retention ||
-      analytics?.audienceRetention ||
-      [];
+      (Array.isArray(retentionData)
+        ? retentionData
+        : retentionData?.points || []);
 
     if (!Array.isArray(curve)) return [];
 
@@ -510,7 +566,6 @@ export default function Home() {
           point.elapsedVideoTime ??
           point.label ??
           index,
-
         value: Number(
           point.audienceWatchRatio ??
             point.value ??
@@ -521,6 +576,144 @@ export default function Home() {
       .filter((point) => Number.isFinite(point.value));
   }
 
+  // Reusable report list
+  function renderReportList(items, prefix = "item") {
+    if (!Array.isArray(items) || items.length === 0) {
+      return <p className="report-muted">No information available.</p>;
+    }
+
+    return items.map((item, index) => (
+      <div className="report-item" key={`${prefix}-${index}`}>
+        {item}
+      </div>
+    ));
+  }
+
+  // AI Report
+  function renderAIReport() {
+    if (!aiReport?.analysis) return null;
+
+    const analysis = aiReport.analysis;
+
+    return (
+      <div className="performance-panel ai-report">
+        <div className="performance-title">
+          <div>
+            <span className="eyebrow">AI PERFORMANCE INTELLIGENCE</span>
+            <h3>Channel Analysis Report</h3>
+          </div>
+          <Status value="Completed" />
+        </div>
+
+        <p className="report-overview">{analysis.overview}</p>
+
+        <p className="report-meta">
+          Videos analyzed: {aiReport.videosAnalyzed || 0}
+        </p>
+
+        <Section title="Overall Strengths" />
+        {renderReportList(analysis.overallStrengths, "strength")}
+
+        <Section title="Overall Weaknesses" />
+        {renderReportList(analysis.overallWeaknesses, "weakness")}
+
+        <Section title="Top Performers" />
+
+        {(analysis.topPerformers || []).length === 0 ? (
+          <p className="report-muted">No top performers identified.</p>
+        ) : (
+          analysis.topPerformers.map((item, index) => (
+            <div className="report-card" key={`top-${index}`}>
+              <h4>{item.title}</h4>
+              <p>{item.reason}</p>
+            </div>
+          ))
+        )}
+
+        <Section title="Underperformers" />
+
+        {(analysis.underperformers || []).length === 0 ? (
+          <p className="report-muted">No underperformers identified.</p>
+        ) : (
+          analysis.underperformers.map((item, index) => (
+            <div className="report-card" key={`under-${index}`}>
+              <h4>{item.title}</h4>
+
+              <strong>Evidence</strong>
+              {renderReportList(item.evidence, `evidence-${index}`)}
+
+              <strong>Possible Issues</strong>
+              {renderReportList(item.possibleIssues, `issue-${index}`)}
+            </div>
+          ))
+        )}
+
+        <Section title="Video Insights" />
+
+        {(analysis.videoInsights || []).map((item, index) => (
+          <div className="report-card" key={`insight-${index}`}>
+            <h4>{item.title}</h4>
+            <Status value={item.performance} />
+
+            <strong>Strengths</strong>
+            {renderReportList(item.strengths, `video-strength-${index}`)}
+
+            <strong>Weaknesses</strong>
+            {renderReportList(item.weaknesses, `video-weakness-${index}`)}
+
+            <strong>Retention Insights</strong>
+            {renderReportList(
+              item.retentionInsights,
+              `retention-${index}`
+            )}
+
+            <strong>Recommendations</strong>
+            {renderReportList(
+              item.recommendations,
+              `recommendation-${index}`
+            )}
+          </div>
+        ))}
+
+        <Section title="Next Video Strategy" />
+
+        <div className="report-card">
+          {Object.entries(analysis.nextVideoStrategy || {}).map(
+            ([key, value]) => (
+              <div className="strategy-item" key={key}>
+                <strong>
+                  {key.replace(/([A-Z])/g, " $1")}
+                </strong>
+                <p>{value}</p>
+              </div>
+            )
+          )}
+        </div>
+
+        <Section title="Action Plan" />
+
+        {(analysis.actionPlan || []).map((item, index) => (
+          <div className="report-card" key={`action-${index}`}>
+            <Status value={item.priority} />
+            <h4>{item.task}</h4>
+            <p>{item.reason}</p>
+          </div>
+        ))}
+
+        <Section title="Data Limitations" />
+        {renderReportList(analysis.dataLimitations, "limitation")}
+
+        <button
+          className="sync-button report-refresh"
+          onClick={handleAIAnalysis}
+          disabled={aiAnalyzing}
+        >
+          {aiAnalyzing ? "Analyzing..." : "Run Analysis Again ↻"}
+        </button>
+      </div>
+    );
+  }
+
   // Home dashboard
   function renderHome() {
     return (
@@ -528,11 +721,9 @@ export default function Home() {
         <div className="welcome">
           <div>
             <span className="eyebrow">YOUR AI WORKSPACE</span>
-
             <h1>
               Creator<span>OS</span>
             </h1>
-
             <p>Your personal AI YouTube channel manager.</p>
           </div>
 
@@ -564,8 +755,8 @@ export default function Home() {
             {connecting
               ? "Connecting..."
               : channels.length
-              ? "Reconnect YouTube"
-              : "Connect YouTube"}
+                ? "Reconnect YouTube"
+                : "Connect YouTube"}
             →
           </button>
         </div>
@@ -584,7 +775,6 @@ export default function Home() {
           <div className="sync-card">
             <div>
               <h3>Sync YouTube Data</h3>
-
               <p>
                 Import your latest videos and available statistics into
                 CreatorOS.
@@ -613,7 +803,6 @@ export default function Home() {
           <div className="sync-card analytics-card">
             <div>
               <h3>Personalized YouTube Analytics</h3>
-
               <p>
                 Import available watch time, average view duration,
                 engagement and audience-retention data for your videos.
@@ -625,7 +814,7 @@ export default function Home() {
               onClick={handleAnalyticsSync}
               disabled={analyticsSyncing}
             >
-              {analyticsSyncing ? "Analyzing..." : "Sync Analytics ↗"}
+              {analyticsSyncing ? "Syncing..." : "Sync Analytics ↗"}
             </button>
 
             {analyticsResult && (
@@ -639,6 +828,41 @@ export default function Home() {
             )}
           </div>
         )}
+
+        {channels.length > 0 && (
+          <div className="sync-card ai-launch-card">
+            <div>
+              <h3>🩺 AI Video Doctor</h3>
+              <p>
+                Analyze your channel's actual performance, discover
+                weaknesses and get a practical growth strategy.
+              </p>
+            </div>
+
+            <button
+              className="sync-button ai-button"
+              onClick={handleAIAnalysis}
+              disabled={aiAnalyzing || videos.length === 0}
+            >
+              {aiAnalyzing ? "AI Analyzing..." : "Run AI Analysis ✨"}
+            </button>
+
+            {aiAnalyzing && (
+              <div className="ai-loading">
+                <div className="spinner" />
+                <span>
+                  AI is studying your video performance. Please wait...
+                </span>
+              </div>
+            )}
+
+            {aiError && (
+              <div className="error-box">{aiError}</div>
+            )}
+          </div>
+        )}
+
+        {renderAIReport()}
 
         <Section
           title="Video Performance Analysis"
@@ -689,6 +913,7 @@ export default function Home() {
               (() => {
                 const avgDuration = getMetric(
                   selectedVideo,
+                  "averageViewDurationSeconds",
                   "averageViewDuration"
                 );
 
@@ -699,6 +924,7 @@ export default function Home() {
 
                 const watchMinutes = getMetric(
                   selectedVideo,
+                  "watchTimeMinutes",
                   "estimatedMinutesWatched"
                 );
 
@@ -729,7 +955,6 @@ export default function Home() {
                     <div className="performance-title">
                       <div>
                         <span className="eyebrow">SELECTED VIDEO</span>
-
                         <h3>
                           {selectedVideo.title || "Untitled video"}
                         </h3>
@@ -802,7 +1027,6 @@ export default function Home() {
                     <div className="retention-block">
                       <div className="retention-heading">
                         <h4>Audience Retention Curve</h4>
-
                         <span>
                           {retentionPoints.length
                             ? `${retentionPoints.length} data points`
@@ -850,8 +1074,7 @@ export default function Home() {
                         </div>
                       ) : (
                         <p className="chart-empty">
-                          Retention data is not stored in a chart-readable
-                          format for this video yet.
+                          Retention data is not available for this video yet.
                         </p>
                       )}
 
@@ -987,9 +1210,16 @@ export default function Home() {
             <button
               className="module"
               key={title}
-              onClick={() =>
-                alert(`${title}: AI service is not connected yet.`)
-              }
+              onClick={() => {
+                if (title === "Video Doctor") {
+                  setActiveTab("Home");
+                  if (videos.length > 0) {
+                    handleAIAnalysis();
+                  }
+                } else {
+                  alert(`${title}: AI service is not connected yet.`);
+                }
+              }}
             >
               <span>{icon}</span>
               <h3>{title}</h3>
@@ -1045,7 +1275,6 @@ export default function Home() {
               <div className="list-item" key={item.id}>
                 <div>
                   <strong>{item.action_type}</strong>
-
                   <p>
                     {item.created_at
                       ? new Date(item.created_at).toLocaleString()
@@ -1135,7 +1364,7 @@ export default function Home() {
           Logout
         </button>
 
-        <p className="version">CreatorOS · Version 1.2</p>
+        <p className="version">CreatorOS · Version 1.3</p>
       </>
     );
   }
@@ -1241,6 +1470,7 @@ export default function Home() {
           border-top-color: #3198ff;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
+          flex-shrink: 0;
         }
 
         @keyframes spin {
@@ -1437,6 +1667,110 @@ export default function Home() {
           flex-basis: 100%;
           color: #70e0ad;
           font-size: 10px;
+        }
+
+        .ai-launch-card {
+          border-color: #3566a0;
+          background: linear-gradient(110deg, #142c49, #101b2b);
+        }
+
+        .ai-button {
+          background: linear-gradient(120deg, #287fe0, #6654d9);
+        }
+
+        .ai-loading {
+          flex-basis: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: #8fc5ff;
+          font-size: 10px;
+          line-height: 1.5;
+        }
+
+        .ai-loading .spinner {
+          width: 17px;
+          height: 17px;
+        }
+
+        /* AI report */
+        .ai-report {
+          margin-top: 15px;
+        }
+
+        .report-overview {
+          color: #c0d0e3;
+          font-size: 12px;
+          line-height: 1.8;
+          margin: 14px 0;
+        }
+
+        .report-meta {
+          color: #75baff;
+          font-size: 10px;
+        }
+
+        .report-card {
+          padding: 13px;
+          margin: 10px 0;
+          border: 1px solid #203750;
+          border-radius: 10px;
+          background: #0b1726;
+        }
+
+        .report-card h4 {
+          font-size: 12px;
+          line-height: 1.5;
+          margin: 0 0 9px;
+        }
+
+        .report-card p,
+        .report-card strong {
+          font-size: 10px;
+          line-height: 1.7;
+        }
+
+        .report-card p {
+          color: #9aacc2;
+          margin: 5px 0;
+          overflow-wrap: anywhere;
+        }
+
+        .report-card strong {
+          display: block;
+          color: #69b5ff;
+          margin-top: 10px;
+        }
+
+        .report-item {
+          padding: 10px;
+          margin: 7px 0;
+          border-radius: 8px;
+          background: #0b1726;
+          color: #b8c8dc;
+          font-size: 10px;
+          line-height: 1.7;
+          overflow-wrap: anywhere;
+        }
+
+        .report-muted {
+          color: #8293a9;
+          font-size: 10px;
+        }
+
+        .strategy-item {
+          padding-bottom: 10px;
+          margin-bottom: 10px;
+          border-bottom: 1px solid #203750;
+        }
+
+        .strategy-item:last-child {
+          border-bottom: 0;
+          margin-bottom: 0;
+        }
+
+        .report-refresh {
+          margin-top: 12px;
         }
 
         /* Video performance */
