@@ -38,7 +38,9 @@ export default function IntelligencePage() {
             key={mod.title}
             className="module-card"
             onClick={() => {
-              if (mod.title === "Video Doctor" || mod.title === "Channel Monitor") {
+              if (mod.title === "Video Doctor") {
+                router.push("/intelligence/video-doctor");
+              } else if (mod.title === "Channel Monitor") {
                 router.push("/");
               } else {
                 alert(`${mod.title}: Module is configured for future updates.`);
@@ -123,7 +125,7 @@ export default function IntelligencePage() {
 
         .module-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          grid-grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
           gap: 12px;
         }
 
