@@ -65,6 +65,8 @@ export default function ProductionPage() {
                 router.push("/production/ideas");
               } else if (mod.title === "Script Studio") {
                 router.push("/production/script");
+              } else if (mod.title === "Asset Manager") {
+                router.push("/production/assets");
               } else {
                 alert(`${mod.title}: Module will connect in the next backend step.`);
               }
