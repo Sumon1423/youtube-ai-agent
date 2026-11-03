@@ -38,8 +38,16 @@ export default function IntelligencePage() {
             key={mod.title}
             className="module-card"
             onClick={() => {
-              if (mod.title === "Video Doctor") {
-                router.push("/intelligence/video-doctor");
+              onClick={() => {
+  if (mod.title === "Video Doctor") {
+    router.push("/intelligence/video-doctor");
+  } else if (mod.title === "Channel Monitor") {
+    router.push("/intelligence/channel-monitor");
+  } else {
+    alert(`${mod.title}: Module is configured for future updates.`);
+  }
+}}
+
               } else if (mod.title === "Channel Monitor") {
                 router.push("/");
               } else {
