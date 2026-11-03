@@ -38,18 +38,10 @@ export default function IntelligencePage() {
             key={mod.title}
             className="module-card"
             onClick={() => {
-              onClick={() => {
-  if (mod.title === "Video Doctor") {
-    router.push("/intelligence/video-doctor");
-  } else if (mod.title === "Channel Monitor") {
-    router.push("/intelligence/channel-monitor");
-  } else {
-    alert(`${mod.title}: Module is configured for future updates.`);
-  }
-}}
-
+              if (mod.title === "Video Doctor") {
+                router.push("/intelligence/video-doctor");
               } else if (mod.title === "Channel Monitor") {
-                router.push("/");
+                router.push("/intelligence/channel-monitor");
               } else {
                 alert(`${mod.title}: Module is configured for future updates.`);
               }
@@ -133,7 +125,7 @@ export default function IntelligencePage() {
 
         .module-grid {
           display: grid;
-          grid-grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
           gap: 12px;
         }
 
