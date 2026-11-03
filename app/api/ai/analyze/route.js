@@ -11,6 +11,7 @@ const FALLBACK_MODEL = "gemini-3.8-flash";
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/interactions";
 
+// Extract and parse JSON from Gemini response.
 function extractJSON(text) {
   if (!text || typeof text !== "string") {
     throw new Error("Gemini returned an empty response.");
@@ -27,7 +28,7 @@ function extractJSON(text) {
   const end = cleaned.lastIndexOf("}");
 
   if (start === -1 || end <= start) {
-    throw new Error("Gemini did not return a JSON object.");
+    throw new Error("Gemini did not return a complete JSON object.");
   }
 
   cleaned = cleaned.slice(start, end + 1);
@@ -40,6 +41,7 @@ function extractJSON(text) {
   }
 }
 
+// Read text from Gemini Interactions API response.
 function getOutputText(data) {
   if (
     typeof data.output_text === "string" &&
@@ -89,6 +91,7 @@ function isTemporaryError(status) {
   return [429, 500, 502, 503, 504].includes(status);
 }
 
+// Call Gemini once.
 async function callGemini(model, prompt) {
   let response;
 
@@ -127,9 +130,14 @@ async function callGemini(model, prompt) {
   try {
     result = JSON.parse(raw);
   } catch {
-    throw new Error(
-      `${model} returned a non-JSON response. HTTP ${response.status}: ${raw.slice(0, 300)}`
+    const error = new Error(
+      `${model} returned a non-JSON API response. HTTP ${response.status}: ${raw.slice(0, 300)}`
     );
+
+    error.status = response.status;
+    error.model = model;
+
+    throw error;
   }
 
   if (response.ok) {
@@ -152,6 +160,7 @@ async function callGemini(model, prompt) {
   throw error;
 }
 
+// Primary model with automatic fallback.
 async function generateAnalysis(prompt) {
   try {
     return await callGemini(PRIMARY_MODEL, prompt);
@@ -170,6 +179,55 @@ async function generateAnalysis(prompt) {
     );
 
     return await callGemini(FALLBACK_MODEL, prompt);
+  }
+}
+
+// Repair malformed JSON with one additional Gemini request.
+async function extractJSONWithRepair(text, model) {
+  try {
+    return extractJSON(text);
+  } catch (originalError) {
+    console.warn(
+      "Gemini returned invalid JSON. Attempting automatic repair."
+    );
+
+    const repairPrompt = `
+You are a JSON repair assistant.
+
+Repair the malformed JSON below.
+
+STRICT RULES:
+1. Return ONLY one valid JSON object.
+2. Every property name must use double quotes.
+3. Every string value must use double quotes.
+4. Remove trailing commas.
+5. Fix missing commas, brackets, and braces where possible.
+6. Do not use Markdown or code fences.
+7. Do not add explanations.
+8. Preserve all original information and structure.
+9. Do not invent analytics, metrics, or video IDs.
+10. Preserve the original language of all values.
+11. Bengali explanations must remain Bengali.
+12. English technical terms and English video titles must remain English.
+13. Never translate JSON property names.
+
+MALFORMED JSON:
+${text}
+`;
+
+    try {
+      const repaired = await callGemini(model, repairPrompt);
+      return extractJSON(repaired.text);
+    } catch (repairError) {
+      console.error(
+        "Automatic JSON repair failed:",
+        repairError.message
+      );
+
+      throw new Error(
+        `Gemini JSON repair failed. Original error: ${originalError.message}`
+      );
+    }
   }
 }
 
@@ -195,23 +253,65 @@ function normalizeVideo(video) {
   };
 }
 
+// Build Bengali-English hybrid analysis prompt.
 function buildPrompt(channel, videos) {
   return `
 You are a professional YouTube Shorts growth analyst.
 
 Analyze the following real channel and video data.
 The channel targets viewers in the United States.
-Give practical, evidence-based recommendations.
 
-IMPORTANT RULES:
+Your job is to help the creator understand channel performance
+and make better decisions using real analytics.
+
+LANGUAGE AND COMMUNICATION RULES:
+
+1. Write all explanations primarily in natural, conversational Bengali (বাংলা).
+2. Use simple, clear Bengali that a Bangladeshi creator can easily understand.
+3. Mix English naturally when using important YouTube, analytics,
+   editing, and technical terms.
+4. Keep commonly used technical terms in English, including:
+   Hook, Retention, Audience Retention, CTR, Engagement, Views,
+   Swipe Rate, Shorts, Algorithm, SEO, Title, Description,
+   Thumbnail, Editing, Transition, Sound Effects, CTA,
+   Storytelling, Pacing, Visuals, Analytics, and Content Strategy.
+5. Do not translate technical terms awkwardly into Bengali.
+6. Explain technical concepts in Bengali so the creator understands
+   what they mean and what action to take.
+7. Recommendations and explanations must be primarily Bengali.
+8. Avoid unnecessary full English sentences.
+9. Video titles, SEO keywords, hashtags, and English content examples
+   must remain in English because the target audience is in the USA.
+10. Any suggested English video script or hook for the USA audience
+    must be written in natural American English.
+11. JSON property names must remain exactly as given in the schema.
+12. Never translate JSON property names.
+13. Bengali and English can be mixed naturally within the same value.
+14. Do not write the entire analysis in English.
+15. Most explanatory text must be Bengali.
+
+ANALYSIS RULES:
+
 1. Do not invent analytics, metrics, audience behavior, or video details.
 2. Clearly distinguish measured facts from hypotheses.
 3. Do not claim a video succeeded or failed based only on views.
 4. Compare videos fairly, considering their available data.
 5. If data is missing, mention it in dataLimitations.
 6. Give specific improvements, not generic advice.
-7. Return ONLY valid JSON. Do not use Markdown or code fences.
-8. All written analysis must be in English.
+7. Analyze only the videos provided below.
+8. Do not invent video IDs.
+9. Use empty arrays when there is not enough evidence.
+10. Do not make unsupported claims about the YouTube algorithm.
+
+JSON OUTPUT RULES:
+
+1. Return ONLY valid JSON.
+2. Do not use Markdown or code fences.
+3. Every JSON property name must use double quotes.
+4. Never use trailing commas.
+5. Ensure every bracket and brace is properly closed.
+6. Return one complete JSON object.
+7. Keep the response concise enough to avoid output truncation.
 
 CHANNEL:
 ${JSON.stringify(channel, null, 2)}
@@ -223,73 +323,85 @@ Return this exact JSON structure:
 
 {
   "overview": {
-    "summary": "Short overall channel assessment",
+    "summary": "বাংলায় সংক্ষিপ্ত Channel assessment",
     "overallStatus": "Growing, Stable, or Needs Improvement",
-    "keyFinding": "Most important evidence-based finding"
+    "keyFinding": "বাংলায় সবচেয়ে গুরুত্বপূর্ণ data-based finding"
   },
   "strengths": [
     {
-      "title": "Strength",
-      "evidence": "Supporting data",
-      "recommendation": "How to build on it"
+      "title": "বাংলায় Strength-এর নাম",
+      "evidence": "বাংলায় supporting data",
+      "recommendation": "বাংলায় কীভাবে উন্নতি করবে"
     }
   ],
   "weaknesses": [
     {
-      "title": "Weakness",
-      "evidence": "Supporting data",
-      "recommendation": "How to improve"
+      "title": "বাংলায় Weakness-এর নাম",
+      "evidence": "বাংলায় supporting data",
+      "recommendation": "বাংলায় কীভাবে উন্নতি করবে"
     }
   ],
   "topPerformers": [
     {
-      "videoId": "Video ID",
-      "title": "Video title",
-      "reason": "Evidence-based explanation"
+      "videoId": "Actual video ID",
+      "title": "Actual video title",
+      "reason": "বাংলায় evidence-based explanation"
     }
   ],
   "underperformers": [
     {
-      "videoId": "Video ID",
-      "title": "Video title",
-      "reason": "Evidence-based explanation",
-      "improvement": "Suggested improvement"
+      "videoId": "Actual video ID",
+      "title": "Actual video title",
+      "reason": "বাংলায় evidence-based explanation",
+      "improvement": "বাংলায় improvement suggestion"
     }
   ],
   "videoInsights": [
     {
-      "videoId": "Video ID",
-      "title": "Video title",
-      "whatWorked": "What appears to have worked",
-      "whatDidNotWork": "What may need improvement",
-      "nextStep": "Specific next step"
+      "videoId": "Actual video ID",
+      "title": "Actual video title",
+      "whatWorked": "বাংলায় কী ভালো কাজ করেছে",
+      "whatDidNotWork": "বাংলায় কী উন্নতি করা দরকার",
+      "nextStep": "বাংলায় নির্দিষ্ট next step"
     }
   ],
   "nextVideoStrategy": {
-    "recommendedConcept": "One specific next video concept",
-    "targetAudience": "Intended audience",
-    "hook": "Opening hook",
-    "contentAngle": "Unique angle",
-    "reason": "Why this concept is recommended based on the data",
-    "titleIdeas": ["Title 1", "Title 2", "Title 3"],
+    "recommendedConcept": "বাংলায় পরবর্তী ভিডিওর concept",
+    "targetAudience": "USA audience-এর বিবরণ",
+    "hook": "Natural American English opening hook",
+    "contentAngle": "বাংলায় unique content angle",
+    "reason": "বাংলায় data-based recommendation reason",
+    "titleIdeas": [
+      "English Title 1",
+      "English Title 2",
+      "English Title 3"
+    ],
     "editingSuggestions": [
-      "Specific editing suggestion"
+      "বাংলায় নির্দিষ্ট editing suggestion"
     ]
   },
   "actionPlan": [
     {
       "priority": "High, Medium, or Low",
-      "action": "What to do",
-      "reason": "Why it matters"
+      "action": "বাংলায় কী করতে হবে",
+      "reason": "বাংলায় কেন এটি গুরুত্বপূর্ণ"
     }
   ],
   "dataLimitations": [
-    "Missing or insufficient data"
+    "বাংলায় missing বা insufficient data-এর বিবরণ"
   ]
 }
 
-Use empty arrays when there is not enough evidence.
-Do not invent video IDs. Use the actual IDs provided above.
+IMPORTANT FINAL CHECK:
+Before responding, verify that:
+- The JSON is syntactically valid.
+- All property names are in English exactly as specified.
+- Most explanations are in Bengali.
+- Technical terms remain in English where appropriate.
+- USA-facing titles and hooks are in natural American English.
+- No video ID or analytics value has been invented.
+
+Return ONLY the JSON object.
 `;
 }
 
@@ -441,10 +553,14 @@ export async function POST(request) {
 
     const prompt = buildPrompt(channelSummary, videos);
 
-    // Primary model with automatic fallback.
+    // Generate analysis using primary model and fallback.
     const generated = await generateAnalysis(prompt);
 
-    const analysis = extractJSON(generated.text);
+    // Parse JSON and repair once if necessary.
+    const analysis = await extractJSONWithRepair(
+      generated.text,
+      generated.model
+    );
 
     const requiredFields = [
       "overview",
@@ -492,7 +608,9 @@ export async function POST(request) {
       },
       {
         status:
-          error.status && error.status >= 400 && error.status < 600
+          error.status &&
+          error.status >= 400 &&
+          error.status < 600
             ? error.status
             : 500,
       }
