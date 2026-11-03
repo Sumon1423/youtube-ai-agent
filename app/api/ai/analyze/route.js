@@ -5,14 +5,17 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// ------------------------------------------
+// Extract and validate Gemini JSON
+// ------------------------------------------
+
 function extractJSON(text) {
   if (!text || typeof text !== "string") {
     throw new Error("Gemini returned an empty response.");
   }
 
-  let cleaned = text.trim();
-
-  cleaned = cleaned
+  const cleaned = text
+    .trim()
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "")
@@ -24,7 +27,6 @@ function extractJSON(text) {
     throw new Error("Gemini did not return a JSON object.");
   }
 
-  // Find the matching closing brace while respecting strings.
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -41,7 +43,6 @@ function extractJSON(text) {
       } else if (char === '"') {
         inString = false;
       }
-
       continue;
     }
 
@@ -63,15 +64,17 @@ function extractJSON(text) {
     throw new Error("Gemini returned incomplete JSON.");
   }
 
-  const jsonText = cleaned.slice(start, end + 1);
-
   try {
-    return JSON.parse(jsonText);
+    return JSON.parse(cleaned.slice(start, end + 1));
   } catch (error) {
     console.error("Gemini JSON parsing failed:", error.message);
     throw new Error("Gemini returned malformed JSON.");
   }
 }
+
+// ------------------------------------------
+// Helpers
+// ------------------------------------------
 
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") {
@@ -79,6 +82,7 @@ function numberOrNull(value) {
   }
 
   const number = Number(value);
+
   return Number.isFinite(number) ? number : null;
 }
 
@@ -105,17 +109,21 @@ function buildVideoData(video) {
 
     views: numberOrNull(analytics.views ?? video.views),
     likes: numberOrNull(analytics.likes ?? video.likes),
+
     comments: numberOrNull(
       analytics.comments ?? video.comments_count
     ),
 
     shares: numberOrNull(analytics.shares),
+
     watchTimeMinutes: numberOrNull(
       analytics.watchTimeMinutes
     ),
+
     averageViewDurationSeconds: numberOrNull(
       analytics.averageViewDurationSeconds
     ),
+
     averageViewPercentage: numberOrNull(
       analytics.averageViewPercentage ?? video.retention
     ),
@@ -123,6 +131,7 @@ function buildVideoData(video) {
     subscribersGained: numberOrNull(
       analytics.subscribersGained
     ),
+
     subscribersLost: numberOrNull(
       analytics.subscribersLost
     ),
@@ -162,10 +171,7 @@ function validateAnalysis(analysis) {
     typeof analysis.overview !== "object"
   ) {
     analysis.overview = {
-      summary:
-        typeof analysis.overview === "string"
-          ? analysis.overview
-          : "Analysis completed.",
+      summary: "Analysis completed.",
       performanceLevel: "Unknown",
       totalViews: 0,
       averageViews: 0,
@@ -184,14 +190,18 @@ function validateAnalysis(analysis) {
   return analysis;
 }
 
+// ------------------------------------------
+// Gemini Interactions API
+// ------------------------------------------
+
 async function callGemini(videoData, channelName) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model =
-    process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is missing in server settings.");
   }
+
+  const model = "gemini-3.8-flash";
 
   const totalViews = videoData.reduce(
     (sum, video) => sum + (video.views || 0),
@@ -238,7 +248,7 @@ IMPORTANT RULES:
 - Keep video titles exactly as supplied.
 - Keep metric names such as Views, CTR, Retention and Watch Time in English.
 - Never invent analytics, audience demographics, CTR, impressions or traffic sources.
-- Do not claim to know why viewers swiped away unless the supplied data supports it.
+- Do not claim to know why viewers swiped away unless the supplied data supports the conclusion.
 - Distinguish measured facts from possible explanations.
 - Do not assume every video is a YouTube Short if its data does not establish that.
 - If information is missing, mention it in dataLimitations.
@@ -304,12 +314,19 @@ REQUIRED JSON STRUCTURE:
   "dataLimitations": ["string"]
 }
 
-The totalViews and averageViews in overview must be calculated from the supplied data.
+The totalViews and averageViews in overview must be calculated
+from the supplied data.
+
 The totalVideosAnalyzed must equal the number of supplied videos.
+
+Use these exact totals:
+totalViews = ${totalViews}
+averageViews = ${averageViews}
+totalVideosAnalyzed = ${videoData.length}
 `;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
     {
       method: "POST",
       headers: {
@@ -317,16 +334,12 @@ The totalVideosAnalyzed must equal the number of supplied videos.
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.25,
-          maxOutputTokens: 7000,
-          responseMimeType: "application/json",
+        model,
+        input: prompt,
+        store: false,
+        generation_config: {
+          thinking_level: "medium",
+          max_output_tokens: 7000,
         },
       }),
       cache: "no-store",
@@ -353,32 +366,55 @@ The totalVideosAnalyzed must equal the number of supplied videos.
   if (!response.ok) {
     console.error("Gemini API error:", result);
 
-    const message =
-      result.error?.message ||
-      `Gemini API request failed (HTTP ${response.status}).`;
-
-    throw new Error(message);
-  }
-
-  const generatedText =
-    result.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text || "")
-      .join("")
-      .trim();
-
-  if (!generatedText) {
-    const reason =
-      result.candidates?.[0]?.finishReason ||
-      "Unknown";
-
     throw new Error(
-      `Gemini returned no analysis text. Finish reason: ${reason}.`
+      result.error?.message ||
+      `Gemini API request failed (HTTP ${response.status}).`
     );
   }
 
+  if (result.status && result.status !== "completed") {
+    throw new Error(
+      `Gemini interaction did not complete. Status: ${result.status}.`
+    );
+  }
+
+  let generatedText = result.output_text || "";
+
+  // Fallback: collect text from model output steps.
+  if (!generatedText && Array.isArray(result.outputs)) {
+    generatedText = result.outputs
+      .filter((item) => item.type === "text")
+      .map((item) => item.text || "")
+      .join("");
+  }
+
+  // Fallback for responses that expose steps.
+  if (!generatedText && Array.isArray(result.steps)) {
+    generatedText = result.steps
+      .filter((step) => step.type === "model_output")
+      .flatMap((step) => step.content || [])
+      .filter((part) => part.type === "text")
+      .map((part) => part.text || "")
+      .join("");
+  }
+
+  if (!generatedText.trim()) {
+    console.error(
+      "Gemini returned no output text:",
+      JSON.stringify(result).slice(0, 1500)
+    );
+
+    throw new Error("Gemini returned an empty analysis.");
+  }
+
   const analysis = extractJSON(generatedText);
+
   return validateAnalysis(analysis);
 }
+
+// ------------------------------------------
+// POST: AI Video Doctor
+// ------------------------------------------
 
 export async function POST(request) {
   try {
@@ -393,17 +429,24 @@ export async function POST(request) {
 
     if (!supabaseUrl || !publishableKey || !secretKey) {
       return NextResponse.json(
-        { success: false, error: "Supabase server configuration is incomplete." },
+        {
+          success: false,
+          error: "Supabase server configuration is incomplete.",
+        },
         { status: 500 }
       );
     }
 
+    // Authenticate user.
     const authorization =
       request.headers.get("authorization");
 
     if (!authorization?.startsWith("Bearer ")) {
       return NextResponse.json(
-        { success: false, error: "Authentication required." },
+        {
+          success: false,
+          error: "Authentication required.",
+        },
         { status: 401 }
       );
     }
@@ -433,13 +476,17 @@ export async function POST(request) {
 
     if (authError || !authData?.user) {
       return NextResponse.json(
-        { success: false, error: "Invalid login session. Please log in again." },
+        {
+          success: false,
+          error: "Invalid login session. Please log in again.",
+        },
         { status: 401 }
       );
     }
 
     const userId = authData.user.id;
 
+    // Server-side database client.
     const admin = createClient(
       supabaseUrl,
       secretKey,
@@ -451,12 +498,15 @@ export async function POST(request) {
       }
     );
 
+    // Find connected YouTube channel.
     const {
       data: channel,
       error: channelError,
     } = await admin
       .from("channels")
-      .select("id,channel_id,channel_name,connection_status")
+      .select(
+        "id,channel_id,channel_name,connection_status"
+      )
       .eq("user_id", userId)
       .eq("connection_status", "connected")
       .limit(1)
@@ -466,18 +516,25 @@ export async function POST(request) {
       console.error("Channel lookup failed:", channelError);
 
       return NextResponse.json(
-        { success: false, error: "Could not load your connected YouTube channel." },
+        {
+          success: false,
+          error: "Could not load your connected YouTube channel.",
+        },
         { status: 500 }
       );
     }
 
     if (!channel) {
       return NextResponse.json(
-        { success: false, error: "No connected YouTube channel found." },
+        {
+          success: false,
+          error: "No connected YouTube channel found.",
+        },
         { status: 404 }
       );
     }
 
+    // Load synced videos and analytics.
     const {
       data: videos,
       error: videosError,
@@ -494,7 +551,10 @@ export async function POST(request) {
       console.error("Video lookup failed:", videosError);
 
       return NextResponse.json(
-        { success: false, error: "Could not load your synced videos." },
+        {
+          success: false,
+          error: "Could not load your synced videos.",
+        },
         { status: 500 }
       );
     }
@@ -503,7 +563,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: "No synced videos found. Sync your YouTube videos and analytics first.",
+          error: "No synced videos found. Sync your YouTube videos first.",
         },
         { status: 400 }
       );
@@ -511,6 +571,7 @@ export async function POST(request) {
 
     const videoData = videos.map(buildVideoData);
 
+    // Run AI analysis.
     const analysis = await callGemini(
       videoData,
       channel.channel_name || "YouTube Channel"
