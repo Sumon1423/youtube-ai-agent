@@ -2,123 +2,130 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabase";
 
 export default function ScriptStudioPage() {
   const router = useRouter();
   const [selectedIdea, setSelectedIdea] = useState(null);
-  const [scriptData, setScriptData] = useState(null);
+  const [scriptContent, setScriptContent] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedIdea = localStorage.getItem("selected_idea");
-    if (savedIdea) {
-      setSelectedIdea(JSON.parse(savedIdea));
-    }
-  }, []);
+    async function initScriptStudio() {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        router.replace("/login");
+        return;
+      }
 
-  const generateScriptAndStoryboard = () => {
+      const savedIdea = localStorage.getItem("selected_idea");
+      if (savedIdea) {
+        const parsed = JSON.parse(savedIdea);
+        setSelectedIdea(parsed);
+        if (parsed.script) {
+          setScriptContent(parsed.script);
+        }
+      }
+      setLoading(false);
+    }
+    initScriptStudio();
+  }, [router]);
+
+  const handleGenerateRealScript = async () => {
+    if (!selectedIdea) {
+      alert("No active idea selected! Please select an idea first.");
+      return;
+    }
+
     setGenerating(true);
-    setTimeout(() => {
-      setScriptData({
-        title: selectedIdea?.title || "Autonomous Shorts Script",
-        language: "English (US)",
-        scenes: [
-          {
-            scene: 1,
-            duration: "0-3s",
-            visual: "Dark vintage aviation map overlaying misty ocean graphics.",
-            narration: selectedIdea?.hook || "In 1948, an American bomber disappeared without a trace...",
-            onScreenText: "DISAPPEARED WITHOUT A TRACE ⚠️",
-            soundFx: "Deep Dramatic Bass Drop"
-          },
-          {
-            scene: 2,
-            duration: "4-12s",
-            visual: "Archival military documents and rapid zoom on classified stamp.",
-            narration: "The flight took off under clear skies. But 20 minutes in, the pilot sent a message that made no sense.",
-            onScreenText: "CLASSIFIED TRANSMISSION 📡",
-            soundFx: "Static Radio Noise"
-          },
-          {
-            scene: 3,
-            duration: "13-25s",
-            visual: "Dramatic portrait sketches and timeline animation.",
-            narration: "Search teams found no wreckage, no oil slicks, and no distress signals. It vanished into thin air.",
-            onScreenText: "VANISHED INTO THIN AIR 🌫️",
-            soundFx: "Tense Wind Sound"
-          }
-        ]
+    try {
+      const res = await fetch('/api/generate-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: selectedIdea.title })
       });
+
+      const data = await res.json();
+      if (data.success) {
+        setScriptContent(data.script);
+        const updatedIdea = { ...selectedIdea, script: data.script };
+        localStorage.setItem("selected_idea", JSON.stringify(updatedIdea));
+      } else {
+        alert("Error generating script: " + data.error);
+      }
+    } catch (err) {
+      alert("Network error: " + err.message);
+    } finally {
       setGenerating(false);
-    }, 1500);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="page-loading">
+        <div className="spinner" />
+        <p>Loading Script Studio...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="script-container">
-      <button className="btn-back" onClick={() => router.push("/production/ideas")}>
-        ← Back to Video Ideas
+      <button className="btn-back" onClick={() => router.push("/production")}>
+        ← Back to Production Studio
       </button>
 
       <div className="page-header">
-        <span className="eyebrow">SCRIPT & STORYBOARD ENGINE</span>
+        <span className="eyebrow">REAL AI SCRIPT ENGINE</span>
         <h1>Script Studio ✍️</h1>
-        <p>Automated Scene-by-Scene Scripting & Visual Storyboard Generation.</p>
+        <p>Generate high-retention US True Crime scripts powered by live AI.</p>
       </div>
 
       {selectedIdea && (
-        <div className="active-idea-box">
-          <span>Selected Concept:</span>
+        <div className="active-idea-card">
+          <span>Selected Topic:</span>
           <strong>{selectedIdea.title}</strong>
         </div>
       )}
 
-      <button className="btn-generate" onClick={generateScriptAndStoryboard} disabled={generating}>
-        {generating ? "Generating Storyboard..." : "🎬 Generate US English Script & Storyboard"}
+      <button className="btn-generate" onClick={handleGenerateRealScript} disabled={generating}>
+        {generating ? "AI is writing viral script..." : "🤖 Generate Real AI Script"}
       </button>
 
-      {scriptData && (
-        <div className="script-results">
-          <div className="script-header">
-            <h3>{scriptData.title}</h3>
-            <span className="lang-tag">{scriptData.language}</span>
-          </div>
-
-          <div className="storyboard-list">
-            {scriptData.scenes.map((sc) => (
-              <div key={sc.scene} className="scene-card">
-                <div className="scene-top">
-                  <span className="scene-num">Scene {sc.scene}</span>
-                  <span className="scene-dur">⏱️ {sc.duration}</span>
-                </div>
-                <p><strong>Visual Direction:</strong> {sc.visual}</p>
-                <p><strong>Narration (Audio):</strong> "{sc.narration}"</p>
-                <p><strong>On-Screen Text:</strong> <span className="text-highlight">{sc.onScreenText}</span></p>
-                <p className="sfx">🔊 <strong>SFX:</strong> {sc.soundFx}</p>
-              </div>
-            ))}
+      {scriptContent && (
+        <div className="script-output-box">
+          <h3>Generated Script & Visual Cues:</h3>
+          <textarea 
+            value={scriptContent} 
+            onChange={(e) => setScriptContent(e.target.value)}
+            rows={12}
+            className="script-textarea"
+          />
+          <div className="action-buttons">
+            <button className="btn-proceed" onClick={() => router.push("/production/voice")}>
+              Proceed to Voice Studio →
+            </button>
           </div>
         </div>
       )}
 
       <style jsx>{`
-        .script-container { display: flex; flex-direction: column; gap: 16px; }
+        .script-container { display: flex; flex-direction: column; gap: 16px; padding-bottom: 30px; }
         .btn-back { background: transparent; border: none; color: #3298ff; font-size: 11px; cursor: pointer; width: fit-content; padding: 0; }
         .eyebrow { color: #52b5ff; font-size: 10px; letter-spacing: 1.5px; font-weight: 800; }
         .page-header h1 { font-size: 24px; margin: 4px 0; }
         .page-header p { color: #8da2bb; font-size: 12px; margin: 0; }
-        .active-idea-box { padding: 10px 14px; background: rgba(37, 216, 232, 0.08); border: 1px solid rgba(37, 216, 232, 0.2); border-radius: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 2px; color: #25d8e8; }
-        .btn-generate { background: #3298ff; color: #ffffff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
-        .script-results { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
-        .script-header { display: flex; justify-content: space-between; align-items: center; background: rgba(15, 27, 44, 0.7); padding: 12px; border-radius: 10px; border: 1px solid rgba(112, 165, 220, 0.16); }
-        .script-header h3 { margin: 0; font-size: 13px; color: #edf6ff; }
-        .lang-tag { background: rgba(69, 223, 170, 0.15); color: #45dfaa; padding: 2px 8px; border-radius: 6px; font-size: 9px; font-weight: bold; }
-        .storyboard-list { display: flex; flex-direction: column; gap: 10px; }
-        .scene-card { padding: 14px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); border-radius: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #aab7c8; }
-        .scene-top { display: flex; justify-content: space-between; font-weight: bold; }
-        .scene-num { color: #25d8e8; }
-        .scene-dur { color: #8da2bb; font-size: 10px; }
-        .text-highlight { color: #ffc107; font-weight: bold; }
-        .sfx { color: #52b5ff; margin: 0; }
+        .active-idea-card { padding: 12px; background: rgba(37, 216, 232, 0.08); border: 1px solid rgba(37, 216, 232, 0.2); border-radius: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 2px; color: #25d8e8; }
+        .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .script-output-box { display: flex; flex-direction: column; gap: 10px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 16px; border-radius: 12px; }
+        .script-output-box h3 { font-size: 13px; color: #45dfaa; margin: 0; }
+        .script-textarea { width: 100%; background: #07111e; color: #fff; border: 1px solid rgba(112, 165, 220, 0.3); border-radius: 8px; padding: 12px; font-size: 12px; font-family: monospace; resize: vertical; }
+        .action-buttons { display: flex; justify-content: flex-end; margin-top: 4px; }
+        .btn-proceed { background: rgba(50, 152, 255, 0.2); color: #52b5ff; border: 1px solid rgba(50, 152, 255, 0.4); padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .page-loading { text-align: center; color: #8da2bb; font-size: 11px; padding: 30px; }
+        .spinner { width: 24px; height: 24px; border: 2px solid rgba(82, 144, 201, 0.22); border-top-color: #25d8e8; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
