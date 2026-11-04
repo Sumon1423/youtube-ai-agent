@@ -16,12 +16,12 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'ELEVENLABS_API_KEY is missing in environment variables.' }, { status: 500 });
     }
 
-    // ক্লিন করার প্রক্রিয়া: ব্র্যাকেট বা সিন হেডিং (যেমন [Scene], Title:, ইত্যাদি) ফিল্টার করে বাদ দেওয়া
+    // স্ক্রিপ্ট থেকে হুক, এন্ডিং, সিন হেডিং এবং যেকোনো ব্র্যাকেট বা লেবেল সম্পূর্ণ বাদ দেওয়ার ফিল্টার
     const cleanScript = script
-      .replace(/\[.*?\]/g, '') // থার্ড ব্র্যাকেটের ভেতরের সব রিমুভ
+      .replace(/\[.*?\]/g, '') // থার্ড ব্র্যাকেটের ভেتরের সব রিমুভ
       .replace(/\(.*?\)/g, '') // ফার্স্ট ব্র্যাকেটের ভেতরের সব রিমুভ
-      .replace(/Title:.*?\n/gi, '') // টাইটেল লাইন রিমুভ
-      .replace(/Scene.*?\n/gi, '') // সিন হেডিং রিমুভ
+      .replace(/^(Hook|Ending|Scene|Title|Intro|Outro|Narrator|Voiceover)[\s\:\-]*/gim, '') // হুক, এন্ডিং, সিন ইত্যাদি লেবেল রিমুভ
+      .replace(/(Hook:|Ending:|Scene \d+:|Title:)/gi, '') // ডাবল প্রটেকশনের জন্য নির্দিষ্ট কিওয়ার্ড রিমুভ
       .trim();
 
     const safeVoiceId = 'EXAVITQu4vr4xnSDxMaL';
@@ -34,7 +34,7 @@ export async function POST(req) {
         'xi-api-key': elevenLabsApiKey,
       },
       body: JSON.stringify({
-        text: cleanScript || script, // যদি ক্লিন করার পর কিছু না থাকে তবে মূল স্ক্রিপ্ট নিবে
+        text: cleanScript || script,
         model_id: 'eleven_multilingual_v2',
         voice_settings: {
           stability: 0.75,
