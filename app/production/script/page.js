@@ -9,15 +9,16 @@ export default function ScriptStudioPage() {
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [scriptContent, setScriptContent] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [consoleLogs, setConsoleLogs] = useState([]);
 
-  // রিয়েল প্রসেসিং ধাপসমূহ
-  const steps = [
-    "Initializing Gemini AI connection...",
-    "Analyzing True Crime topic & target retention hooks...",
-    "Drafting 50-60s script with dynamic B-Roll visual cues...",
-    "Finalizing formatting & polishing narration..."
+  // রোমাঞ্চকর ও কুল টার্মিনাল লগস
+  const hackerLogs = [
+    "Establishing secure socket to Gemini AI Core...",
+    "Injecting US True Crime narrative parameters...",
+    "Optimizing retention hooks for first 3 seconds...",
+    "Synthesizing high-tension cinematic B-Roll cues...",
+    "Finalizing script structure & compiling output..."
   ];
 
   useEffect(() => {
@@ -41,16 +42,20 @@ export default function ScriptStudioPage() {
     initScriptStudio();
   }, [router]);
 
-  // রিয়েল প্রসেসিংয়ের সাথে ধাপগুলো পরিবর্তন করার অ্যানিমেশন
+  // রিয়েল-টাইম টার্মিনাল লগ প্রিন্টিং এফেক্ট
   useEffect(() => {
-    let interval;
+    let timer;
     if (generating) {
-      setCurrentStep(0);
-      interval = setInterval(() => {
-        setCurrentStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
-      }, 1200); // প্রতি ১.২ সেকেন্ডে পরের ধাপে যাবে
+      setConsoleLogs([]);
+      let index = 0;
+      timer = setInterval(() => {
+        if (index < hackerLogs.length) {
+          setConsoleLogs((prev) => [...prev, hackerLogs[index]]);
+          index++;
+        }
+      }, 600);
     }
-    return () => clearInterval(interval);
+    return () => clearInterval(timer);
   }, [generating]);
 
   const handleGenerateGeminiScript = async () => {
@@ -117,16 +122,25 @@ export default function ScriptStudioPage() {
       )}
 
       <button className="btn-generate" onClick={handleGenerateGeminiScript} disabled={generating}>
-        {generating ? "AI is processing..." : "🤖 Generate Script with Gemini AI"}
+        {generating ? "AI Engine Running..." : "🤖 Generate Script with Gemini AI"}
       </button>
 
-      {/* লাইভ প্রসেসিং স্ট্যাটাস বক্স (ফেক প্রগ্রেসবারের বদলে বাস্তবসম্মত প্রসেস স্টেপস) */}
+      {/* আকর্ষণীয় সাইবারপাঙ্ক টার্মিনাল লগ ভিউ */}
       {generating && (
-        <div className="processing-box">
-          <div className="processing-spinner" />
-          <div className="processing-info">
-            <span className="step-title">Pipeline Active...</span>
-            <span className="step-desc">{steps[currentStep]}</span>
+        <div className="terminal-box">
+          <div className="terminal-header">
+            <span className="dot red"></span>
+            <span className="dot yellow"></span>
+            <span className="dot green"></span>
+            <span className="terminal-title">ai-core-stream@creatoros:~</span>
+          </div>
+          <div className="terminal-body">
+            {consoleLogs.map((log, idx) => (
+              <div key={idx} className="terminal-line">
+                <span className="prompt-symbol">&gt;</span> {log}
+              </div>
+            ))}
+            <div className="cursor-blink">_</div>
           </div>
         </div>
       )}
@@ -158,12 +172,21 @@ export default function ScriptStudioPage() {
         .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; transition: opacity 0.2s; }
         .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
         
-        /* লাইভ প্রসেসিং বক্স ডিজাইন */
-        .processing-box { background: rgba(15, 27, 44, 0.8); border: 1px solid rgba(37, 216, 232, 0.4); padding: 16px; border-radius: 12px; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 20px rgba(37, 216, 232, 0.1); }
-        .processing-spinner { width: 22px; height: 22px; border: 2px solid rgba(37, 216, 232, 0.2); border-top-color: #25d8e8; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
-        .processing-info { display: flex; flex-direction: column; gap: 2px; }
-        .step-title { font-size: 11px; color: #45dfaa; font-weight: bold; letter-spacing: 0.5px; }
-        .step-desc { font-size: 12px; color: #fff; font-family: monospace; }
+        /* টার্মিনাল স্টাইল বক্স ডিজাইন */
+        .terminal-box { background: #030812; border: 1px solid rgba(37, 216, 232, 0.4); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-family: monospace; }
+        .terminal-header { background: #0b162c; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .dot { width: 9px; height: 9px; border-radius: 50%; }
+        .red { background: #ff5f56; }
+        .yellow { background: #ffbd2e; }
+        .green { background: #27c93f; }
+        .terminal-title { font-size: 10px; color: #8da2bb; margin-left: 6px; }
+        .terminal-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; min-height: 100px; }
+        .terminal-line { font-size: 11px; color: #45dfaa; display: flex; gap: 6px; animation: fadeIn 0.3s ease-in-out; }
+        .prompt-symbol { color: #25d8e8; font-weight: bold; }
+        .cursor-blink { font-size: 12px; color: #25d8e8; animation: blink 1s infinite; width: fit-content; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 
         .script-output-box { display: flex; flex-direction: column; gap: 10px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 16px; border-radius: 12px; }
         .script-output-box h3 { font-size: 13px; color: #45dfaa; margin: 0; }
