@@ -4,13 +4,46 @@ import { NextResponse } from 'next/server';
 const API_BASE =
   'https://generativelanguage.googleapis.com/v1beta';
 
+const MAX_RETRIES = 2;
+
 const PREFERRED_MODELS = [
   'gemini-3.8-flash',
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
 ];
 
-async function getAvailableModels(apiKey) {
+const sleep = (ms) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+function getRetryDelay(response, attempt) {
+  const retryAfter = response?.headers?.get('retry-after');
+
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(seconds * 1000, 15000);
+    }
+  }
+
+  // Exponential backoff with jitter.
+  const base = 1000 * Math.pow(2, attempt);
+
+  return Math.min(base + Math.random() * 500, 10000);
+}
+
+function isTemporaryError(status) {
+  return (
+    status === 408 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+}
+
+async function fetchAvailableModels(apiKey) {
   const response = await fetch(`${API_BASE}/models`, {
     method: 'GET',
     headers: {
@@ -22,105 +55,134 @@ async function getAvailableModels(apiKey) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      data.error?.message || 'Unable to fetch Gemini models.'
-    );
-  }
-
-  const models = (data.models || []).filter((model) =>
-    model.supportedGenerationMethods?.includes('generateContent')
-  );
-
-  if (!models.length) {
-    throw new Error(
-      'No Gemini models supporting generateContent are available.'
-    );
-  }
-
-  const availableNames = models.map((model) =>
-    model.name.replace(/^models\//, '')
-  );
-
-  const preferred = PREFERRED_MODELS.filter((name =>
-    availableNames.includes(name)
-  ));
-
-  // Prefer current Flash models. If none match the preferred list,
-  // select another available Flash model.
-  const otherFlashModels = availableNames.filter((name) =>
-    /flash/i.test(name) && !preferred.includes(name)
-  );
-
-  const selectedModels = [
-    ...preferred,
-    ...otherFlashModels,
-  ];
-
-  if (!selectedModels.length) {
-    throw new Error(
-      'No available Gemini Flash model supports generateContent.'
-    );
-  }
-
-  return [...new Set(selectedModels)];
-}
-
-async function generateWithModel(apiKey, model, promptText) {
-  const response = await fetch(
-    `${API_BASE}/models/${model}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: promptText,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 8192,
-        },
-      }),
-      cache: 'no-store',
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
     const error = new Error(
-      data.error?.message || `Gemini API error: ${response.status}`
+      data.error?.message || 'Unable to fetch Gemini models.'
     );
 
     error.status = response.status;
     throw error;
   }
 
-  const script = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text || '')
-    .join('')
-    .trim();
+  const availableModels = (data.models || [])
+    .filter((model) =>
+      model.supportedGenerationMethods?.includes(
+        'generateContent'
+      )
+    )
+    .map((model) =>
+      model.name.replace(/^models\//, '')
+    );
 
-  if (!script) {
-    const reason = data.candidates?.[0]?.finishReason;
+  const preferred = PREFERRED_MODELS.filter((name) =>
+    availableModels.includes(name)
+  );
 
+  const otherFlashModels = availableModels.filter(
+    (name) =>
+      /flash/i.test(name) && !preferred.includes(name)
+  );
+
+  const selected = [
+    ...preferred,
+    ...otherFlashModels,
+  ];
+
+  if (!selected.length) {
     throw new Error(
-      reason
-        ? `Gemini returned no script. Finish reason: ${reason}`
-        : 'Gemini returned an empty script.'
+      'No available Gemini Flash model supports generateContent.'
     );
   }
 
-  return script;
+  return [...new Set(selected)];
+}
+
+async function callGemini(apiKey, model, prompt) {
+  const url =
+    `${API_BASE}/models/${model}:generateContent`;
+
+  let lastError;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let response;
+
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 8192,
+          },
+        }),
+        cache: 'no-store',
+      });
+    } catch (error) {
+      // Network errors can be temporary.
+      lastError = error;
+
+      if (attempt < MAX_RETRIES) {
+        await sleep(getRetryDelay(null, attempt));
+        continue;
+      }
+
+      throw error;
+    }
+
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      const script = data.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text || '')
+        .join('')
+        .trim();
+
+      if (!script) {
+        const finishReason =
+          data.candidates?.[0]?.finishReason;
+
+        throw new Error(
+          finishReason
+            ? `Gemini returned no script. Finish reason: ${finishReason}`
+            : 'Gemini returned an empty script.'
+        );
+      }
+
+      return script;
+    }
+
+    const error = new Error(
+      data.error?.message ||
+        `Gemini API returned HTTP ${response.status}`
+    );
+
+    error.status = response.status;
+    lastError = error;
+
+    // Retry temporary errors on the same model.
+    if (
+      isTemporaryError(response.status) &&
+      attempt < MAX_RETRIES
+    ) {
+      await sleep(getRetryDelay(response, attempt));
+      continue;
+    }
+
+    // Non-temporary errors should go to model fallback
+    // without repeatedly calling the same model.
+    throw error;
+  }
+
+  throw lastError || new Error('Gemini request failed.');
 }
 
 export async function POST(req) {
@@ -141,7 +203,10 @@ export async function POST(req) {
 
     if (title.length > 500) {
       return NextResponse.json(
-        { error: 'Video title must be 500 characters or less.' },
+        {
+          error:
+            'Video title must be 500 characters or less.',
+        },
         { status: 400 }
       );
     }
@@ -158,32 +223,31 @@ export async function POST(req) {
       );
     }
 
-    const promptText = `
-You are an expert YouTube True Crime scriptwriter.
-
-Create a high-retention YouTube Shorts script for a United States audience.
+    const prompt = `
+You are an expert YouTube True Crime scriptwriter
+for a United States audience.
 
 VIDEO TITLE:
 "${title}"
 
+Create a high-retention YouTube Shorts script.
+
 REQUIREMENTS:
 - Target duration: 50-60 seconds.
 - Write natural American English.
-- Start with a compelling hook in the first 1-3 seconds.
-- Keep the story tense, engaging, and easy to understand.
-- Use short sentences suitable for narration.
-- Include scene-by-scene [Visual/B-Roll Cues].
-- Include narration for each scene.
-- Build curiosity without misleading the audience.
+- Start with a strong hook in the first 1-3 seconds.
+- Use short, clear narration sentences.
+- Include scene-by-scene visual or B-roll cues.
+- Build suspense without misleading the audience.
 - Do not invent facts about real crimes or real people.
-- If the title concerns a real case, distinguish verified facts from uncertainty.
+- Separate verified facts from uncertainty.
 - End with a memorable conclusion or question.
-- Do not include unnecessary introductions or explanations.
+- Keep the script suitable for Shorts.
 
 OUTPUT FORMAT:
 
 TITLE:
-[Short video title]
+[Video title]
 
 HOOK:
 [Narration]
@@ -207,19 +271,19 @@ SCENE 4:
 ENDING:
 [Narration]
 
-Keep the complete script suitable for a 50-60 second Short.
+Return only the script.
 `;
 
-    const models = await getAvailableModels(apiKey);
+    const models = await fetchAvailableModels(apiKey);
 
     let lastError;
 
     for (const model of models) {
       try {
-        const script = await generateWithModel(
+        const script = await callGemini(
           apiKey,
           model,
-          promptText
+          prompt
         );
 
         return NextResponse.json({
@@ -230,25 +294,46 @@ Keep the complete script suitable for a 50-60 second Short.
       } catch (error) {
         lastError = error;
 
-        // Try the next model if this one is unavailable
-        // or does not support the requested generation.
+        console.error(
+          `Gemini model ${model} failed:`,
+          error.message
+        );
+
+        // Try another model for:
+        // model not found, unsupported model,
+        // temporary server errors, or capacity errors.
         if (
+          error.status === 400 ||
           error.status === 404 ||
-          error.status === 400
+          error.status === 429 ||
+          error.status === 500 ||
+          error.status === 502 ||
+          error.status === 503 ||
+          error.status === 504
         ) {
           continue;
         }
 
-        // Authentication, quota, and server errors should
-        // not be hidden by repeatedly trying other models.
+        // Authentication, permission, and other
+        // non-recoverable errors should stop here.
         throw error;
       }
     }
 
-    throw new Error(
-      `All available Gemini models failed. ${
-        lastError?.message || ''
-      }`
+    const status =
+      lastError?.status === 429
+        ? 429
+        : lastError?.status === 503
+          ? 503
+          : 502;
+
+    throw Object.assign(
+      new Error(
+        `All available Gemini models failed. ${
+          lastError?.message || ''
+        }`
+      ),
+      { status }
     );
   } catch (error) {
     console.error('Script generation error:', error);
@@ -257,7 +342,8 @@ Keep the complete script suitable for a 50-60 second Short.
       {
         success: false,
         error:
-          error.message || 'Gemini AI script generation failed.',
+          error.message ||
+          'Gemini AI script generation failed.',
       },
       {
         status: error.status || 500,
