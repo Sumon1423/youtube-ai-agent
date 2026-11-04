@@ -67,8 +67,8 @@ export default function AIEditorPage() {
           <Player
             component={TrueCrimeScene}
             inputProps={{
-              scriptText: selectedIdea?.script || "Uncovering the dark secrets...",
-              audioUrl: audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+              scriptText: selectedIdea?.script || "In 1948, a top-secret bomber vanished without a trace...",
+              audioUrl: audioUrl || selectedIdea?.audioUrl || ""
             }}
             durationInFrames={1800}
             fps={30}
@@ -90,7 +90,7 @@ export default function AIEditorPage() {
       </div>
 
       <div className="action-buttons">
-        <button className="btn-download" onClick={() => alert("Remotion Player থেকে ভিডিও রেন্ডার ও ডাউনলোড প্রসেস শুরু হচ্ছে!")}>
+        <button className="btn-download" onClick={() => alert("Remotion Player থেকে ভিডিও ফ্রেম রেন্ডার ও ডাউনলোড প্রসেস শুরু হচ্ছে!")}>
           📥 Download Final Video (.mp4)
         </button>
         <button className="btn-proceed" onClick={() => router.push("/production")}>
