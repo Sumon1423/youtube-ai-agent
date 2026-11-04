@@ -16,7 +16,7 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'CARTESIA_API_KEY is missing in environment variables.' }, { status: 500 });
     }
 
-    // Using Cartesia's latest active model 'sonic'
+    // Using Cartesia's current stable sonic model
     const response = await fetch('https://api.cartesia.ai/tts/bytes', {
       method: 'POST',
       headers: {
@@ -25,7 +25,7 @@ export async function POST(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model_id: 'sonic', 
+        model_id: 'sonic-english', 
         transcript: script,
         voice: {
           mode: 'id',
@@ -39,11 +39,17 @@ export async function POST(req) {
       }),
     });
 
+    const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      const errText = await response.text();
-      return NextResponse.json({ success: false, error: `Cartesia API error: ${errText}` }, { status: response.status });
+      return NextResponse.json({ 
+        success: false, 
+        error: data.message || data.error || `Cartesia API error status ${response.status}` 
+      }, { status: response.status });
     }
 
+    // Since /tts/bytes returns binary buffer when successful
+    // Let's handle it safely by checking response type or fallback
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
