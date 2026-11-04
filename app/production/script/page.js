@@ -32,7 +32,7 @@ export default function ScriptStudioPage() {
     initScriptStudio();
   }, [router]);
 
-  const handleGenerateRealScript = async () => {
+  const handleGenerateGeminiScript = async () => {
     if (!selectedIdea) {
       alert("No active idea selected! Please select an idea first.");
       return;
@@ -46,16 +46,22 @@ export default function ScriptStudioPage() {
         body: JSON.stringify({ title: selectedIdea.title })
       });
 
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textError = await res.text();
+        throw new Error(`Server returned non-JSON response (${res.status}). Please check API route path.`);
+      }
+
       const data = await res.json();
       if (data.success) {
         setScriptContent(data.script);
         const updatedIdea = { ...selectedIdea, script: data.script };
-        localStorage.setItem("selected_idea", JSON.stringify(updatedIdea));
+        localStorage.setItem("selected_idea", JSON.stringify(updatedIndex = updatedIdea));
       } else {
         alert("Error generating script: " + data.error);
       }
     } catch (err) {
-      alert("Network error: " + err.message);
+      alert("Network / API Error: " + err.message);
     } finally {
       setGenerating(false);
     }
@@ -77,9 +83,9 @@ export default function ScriptStudioPage() {
       </button>
 
       <div className="page-header">
-        <span className="eyebrow">REAL AI SCRIPT ENGINE</span>
+        <span className="eyebrow">GEMINI AI SCRIPT ENGINE</span>
         <h1>Script Studio ✍️</h1>
-        <p>Generate high-retention US True Crime scripts powered by live AI.</p>
+        <p>Generate high-retention US True Crime scripts powered by Google Gemini AI.</p>
       </div>
 
       {selectedIdea && (
@@ -89,8 +95,8 @@ export default function ScriptStudioPage() {
         </div>
       )}
 
-      <button className="btn-generate" onClick={handleGenerateRealScript} disabled={generating}>
-        {generating ? "AI is writing viral script..." : "🤖 Generate Real AI Script"}
+      <button className="btn-generate" onClick={handleGenerateGeminiScript} disabled={generating}>
+        {generating ? "Gemini AI is writing script..." : "🤖 Generate Script with Gemini AI"}
       </button>
 
       {scriptContent && (
