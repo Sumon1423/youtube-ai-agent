@@ -8,19 +8,18 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Video title is required' }, { status: 400 });
     }
 
-    // Google Gemini API Key ব্যবহার করা (যা সম্পূর্ণ ফ্রি টায়ার অফার করে)
     const geminiApiKey = process.env.GEMINI_API_KEY;
     
     if (!geminiApiKey) {
       return NextResponse.json({ 
-        error: 'GEMINI_API_KEY is missing in Vercel Environment Variables. Please add it.' 
+        error: 'GEMINI_API_KEY is missing in Vercel Environment Variables.' 
       }, { status: 500 });
     }
 
     const promptText = `You are an expert YouTube True Crime scriptwriter for viral US Shorts (50-60s). Write a tense, high-retention script with [Visual/B-Roll Cues] included for the topic: "${title}".`;
 
-    // Google Gemini Flash Model (Fast & Free tier friendly)
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+    // Updated endpoint to use v1 and gemini-1.5-flash securely
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
