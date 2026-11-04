@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
 
 export async function POST(req) {
   try {
@@ -11,37 +12,17 @@ export async function POST(req) {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     
     if (!geminiApiKey) {
-      return NextResponse.json({ 
-        error: 'GEMINI_API_KEY is missing in Vercel Environment Variables.' 
-      }, { status: 500 });
+      return NextResponse.json({ error: 'GEMINI_API_KEY is missing in environment variables.' }, { status: 500 });
     }
+
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const promptText = `You are an expert YouTube True Crime scriptwriter for viral US Shorts (50-60s). Write a tense, high-retention script with [Visual/B-Roll Cues] included for the topic: "${title}".`;
 
-    // Using gemini-1.5-flash with v1beta endpoint which supports generateContent natively
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-
-    const geminiResponse = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: promptText }]
-          }
-        ]
-      })
-    });
-
-    const data = await geminiResponse.json();
-
-    if (!geminiResponse.ok) {
-      return NextResponse.json({ error: data.error?.message || 'Gemini AI generation failed' }, { status: geminiResponse.status });
-    }
-
-    const generatedScript = data.candidates?.[0]?.content?.parts?.[0]?.text || "Script generation failed.";
+    const result = await model.generateContent(promptText);
+    const response = await result.response;
+    const generatedScript = response.text();
 
     return NextResponse.json({ success: true, script: generatedScript });
   } catch (error) {
