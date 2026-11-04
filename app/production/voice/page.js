@@ -36,7 +36,7 @@ export default function VoiceStudioPage() {
     initVoiceStudio();
   }, [router]);
 
-  const handleGenerateVoice = async () => {
+  const handleGenerateCartesiaVoice = async () => {
     if (!scriptText) {
       alert("No script found! Please generate a script in Script Studio first.");
       return;
@@ -56,7 +56,7 @@ export default function VoiceStudioPage() {
         const updatedIdea = { ...selectedIdea, script: scriptText, audioUrl: data.audioUrl };
         localStorage.setItem("selected_idea", JSON.stringify(updatedIdea));
       } else {
-        alert("Error generating voiceover: " + data.error);
+        alert("Error generating Cartesia voiceover: " + data.error);
       }
     } catch (err) {
       alert("Network error: " + err.message);
@@ -81,9 +81,9 @@ export default function VoiceStudioPage() {
       </button>
 
       <div className="page-header">
-        <span className="eyebrow">REAL AI VOICE ENGINE</span>
+        <span className="eyebrow">CARTESIA AI VOICE ENGINE</span>
         <h1>Voice Studio 🎙️</h1>
-        <p>Synthesize professional deep true-crime narration using ElevenLabs API.</p>
+        <p>Synthesize ultra-realistic deep true-crime narration using Cartesia AI Sonic.</p>
       </div>
 
       {selectedIdea && (
@@ -103,13 +103,13 @@ export default function VoiceStudioPage() {
         />
       </div>
 
-      <button className="btn-generate" onClick={handleGenerateVoice} disabled={generatingVoice}>
-        {generatingVoice ? "Synthesizing Deep Narration..." : "🔊 Generate Real AI Voiceover"}
+      <button className="btn-generate" onClick={handleGenerateCartesiaVoice} disabled={generatingVoice}>
+        {generatingVoice ? "Cartesia AI is synthesizing narration..." : "🔊 Generate Cartesia AI Voiceover"}
       </button>
 
       {audioUrl && (
         <div className="audio-output-box">
-          <h3>Narration Audio Ready 🎉</h3>
+          <h3>Cartesia Narration Audio Ready 🎉</h3>
           <audio controls src={audioUrl} style={{ width: "100%", marginTop: "8px" }} />
           
           <div className="action-buttons">
