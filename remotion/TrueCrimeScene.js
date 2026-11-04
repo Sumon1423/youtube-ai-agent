@@ -1,64 +1,70 @@
-import { AbsoluteFill, Audio, useCurrentFrame, interpolate, spring } from 'remotion';
+import { AbsoluteFill, Audio, Img, useCurrentFrame, interpolate } from 'remotion';
 
 export const TrueCrimeScene = ({ scriptText, audioUrl }) => {
   const frame = useCurrentFrame();
 
-  // সিনেমাটিক স্কেল এবং জুম ইফেক্ট
-  const scale = interpolate(frame, [0, 1800], [1, 1.2]);
-  
-  // ফেইড-ইন অ্যানিমেশন
-  const opacity = interpolate(frame, [0, 30], [0, 1], {
-    extrapolateRight: "clamp",
-  });
+  // সিনেমাটিক জুম-ইন (Ken Burns Effect)
+  const scale = interpolate(frame, [0, 1800], [1, 1.25]);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#050b14', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+    <AbsoluteFill style={{ backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
       
-      {/* ব্যাকগ্রাউন্ড সিনেমাটিক গ্রেডিয়েন্ট ও ডার্ক ওভারলে */}
-      <AbsoluteFill style={{ 
-        transform: `scale(${scale})`, 
-        opacity: 0.7, 
-        background: 'radial-gradient(circle, #132238 0%, #050b14 100%)' 
-      }} />
+      {/* ব্যাকগ্রাউন্ড সিনেমাটিক ইমেজ + স্কেলিং এডিটিং */}
+      <AbsoluteFill style={{ transform: `scale(${scale})` }}>
+        <Img 
+          src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1080&auto=format&fit=crop" 
+          style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.4) contrast(1.2)' }}
+        />
+      </AbsoluteFill>
 
-      {/* ভিন্টেজ বা ক্রাইম থিম গ্রিড ওভারলে */}
-      <AbsoluteFill style={{
-        backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
-        backgroundSize: '20px 20px',
-        opacity: 0.3
-      }} />
+      {/* অন্ধকার সিনেমাটিক ওভারলে */}
+      <AbsoluteFill style={{ background: 'radial-gradient(circle, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%)' }} />
 
-      {/* ভয়েস-ওভার অডিও */}
+      {/* আসল ভয়েস-ওভার অডিও (যদি লিংক থাকে) */}
       {audioUrl && <Audio src={audioUrl} />}
 
-      {/* আকর্ষণীয় ও ক্লিন সাবটাইটেল বক্স (প্রফেশনাল লুক) */}
+      {/* টপ ব্যাজ */}
+      <div style={{ position: 'absolute', top: '120px', textAlign: 'center' }}>
+        <span style={{ 
+          background: 'rgba(239, 68, 68, 0.2)', 
+          border: '1px solid #ef4444', 
+          color: '#ef4444', 
+          padding: '6px 16px', 
+          borderRadius: '20px', 
+          fontSize: '14px', 
+          fontWeight: '900',
+          letterSpacing: '3px'
+        }}>
+          CLASSIFIED FILE
+        </span>
+      </div>
+
+      {/* ডায়নামিক সাবটাইটেল বক্স */}
       <div style={{ 
         position: 'absolute', 
-        bottom: '180px', 
+        bottom: '160px', 
         width: '85%', 
         textAlign: 'center', 
-        padding: '24px',
-        background: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(8px)',
+        padding: '20px',
+        background: 'rgba(5, 11, 20, 0.85)',
+        backdropFilter: 'blur(10px)',
         borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        opacity: opacity
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
       }}>
-        <span style={{ color: '#25d8e8', fontSize: '14px', fontWeight: 'bold', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>
-          TRUE CRIME INVESTIGATION
-        </span>
         <p style={{ 
           color: '#ffffff', 
-          fontSize: '28px', 
-          fontFamily: 'system-ui, sans-serif', 
-          fontWeight: '700',
+          fontSize: '26px', 
+          fontFamily: 'sans-serif', 
+          fontWeight: '800',
           lineHeight: '1.4',
-          textShadow: '0 2px 8px rgba(0,0,0,0.9)', 
-          margin: 0 
+          margin: 0,
+          textShadow: '0 2px 10px rgba(0,0,0,0.9)'
         }}>
-          {scriptText ? scriptText.slice(0, 120) + "..." : "Uncovering the dark secrets of history..."}
+          {scriptText ? scriptText.slice(0, 90) + "..." : "In 1948, a top-secret bomber vanished without a trace..."}
         </p>
       </div>
+
     </AbsoluteFill>
   );
 };
