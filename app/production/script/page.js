@@ -9,8 +9,16 @@ export default function ScriptStudioPage() {
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [scriptContent, setScriptContent] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // রিয়েল প্রসেসিং ধাপসমূহ
+  const steps = [
+    "Initializing Gemini AI connection...",
+    "Analyzing True Crime topic & target retention hooks...",
+    "Drafting 50-60s script with dynamic B-Roll visual cues...",
+    "Finalizing formatting & polishing narration..."
+  ];
 
   useEffect(() => {
     async function initScriptStudio() {
@@ -33,22 +41,14 @@ export default function ScriptStudioPage() {
     initScriptStudio();
   }, [router]);
 
-  // প্রগ্রেস বার স্মুথলি বাড়ানোর ফাংশন
+  // রিয়েল প্রসেসিংয়ের সাথে ধাপগুলো পরিবর্তন করার অ্যানিমেশন
   useEffect(() => {
     let interval;
     if (generating) {
-      setProgress(10);
+      setCurrentStep(0);
       interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(interval);
-            return 90;
-          }
-          return prev + 15;
-        });
-      }, 300);
-    } else {
-      setProgress(100);
+        setCurrentStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
+      }, 1200); // প্রতি ১.২ সেকেন্ডে পরের ধাপে যাবে
     }
     return () => clearInterval(interval);
   }, [generating]);
@@ -60,8 +60,6 @@ export default function ScriptStudioPage() {
     }
 
     setGenerating(true);
-    setProgress(10);
-
     try {
       const res = await fetch('/api/generate-script', {
         method: 'POST',
@@ -77,7 +75,6 @@ export default function ScriptStudioPage() {
 
       const data = await res.json();
       if (data.success) {
-        setProgress(100);
         setScriptContent(data.script);
         const updatedIdea = { ...selectedIdea, script: data.script };
         localStorage.setItem("selected_idea", JSON.stringify(updatedIdea));
@@ -120,18 +117,16 @@ export default function ScriptStudioPage() {
       )}
 
       <button className="btn-generate" onClick={handleGenerateGeminiScript} disabled={generating}>
-        {generating ? "Gemini AI is writing script..." : "🤖 Generate Script with Gemini AI"}
+        {generating ? "AI is processing..." : "🤖 Generate Script with Gemini AI"}
       </button>
 
-      {/* আকর্ষণীয় প্রগ্রেস বার */}
+      {/* লাইভ প্রসেসিং স্ট্যাটাস বক্স (ফেক প্রগ্রেসবারের বদলে বাস্তবসম্মত প্রসেস স্টেপস) */}
       {generating && (
-        <div className="progress-box">
-          <div className="progress-info">
-            <span>Crafting viral script & B-roll cues...</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
+        <div className="processing-box">
+          <div className="processing-spinner" />
+          <div className="processing-info">
+            <span className="step-title">Pipeline Active...</span>
+            <span className="step-desc">{steps[currentStep]}</span>
           </div>
         </div>
       )}
@@ -163,11 +158,12 @@ export default function ScriptStudioPage() {
         .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; transition: opacity 0.2s; }
         .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
         
-        /* প্রগ্রেস বারের ডিজাইন */
-        .progress-box { background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(37, 216, 232, 0.3); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .progress-info { display: flex; justify-content: space-between; font-size: 11px; color: #25d8e8; font-weight: bold; }
-        .progress-track { width: 100%; height: 6px; background: #07111e; border-radius: 3px; overflow: hidden; border: 1px solid rgba(112, 165, 220, 0.2); }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #25d8e8, #3298ff); border-radius: 3px; transition: width 0.3s ease-in-out; }
+        /* লাইভ প্রসেসিং বক্স ডিজাইন */
+        .processing-box { background: rgba(15, 27, 44, 0.8); border: 1px solid rgba(37, 216, 232, 0.4); padding: 16px; border-radius: 12px; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 20px rgba(37, 216, 232, 0.1); }
+        .processing-spinner { width: 22px; height: 22px; border: 2px solid rgba(37, 216, 232, 0.2); border-top-color: #25d8e8; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+        .processing-info { display: flex; flex-direction: column; gap: 2px; }
+        .step-title { font-size: 11px; color: #45dfaa; font-weight: bold; letter-spacing: 0.5px; }
+        .step-desc { font-size: 12px; color: #fff; font-family: monospace; }
 
         .script-output-box { display: flex; flex-direction: column; gap: 10px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 16px; border-radius: 12px; }
         .script-output-box h3 { font-size: 13px; color: #45dfaa; margin: 0; }
