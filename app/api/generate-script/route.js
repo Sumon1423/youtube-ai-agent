@@ -18,8 +18,8 @@ export async function POST(req) {
 
     const promptText = `You are an expert YouTube True Crime scriptwriter for viral US Shorts (50-60s). Write a tense, high-retention script with [Visual/B-Roll Cues] included for the topic: "${title}".`;
 
-    // Updated endpoint to use v1 and gemini-1.5-flash securely
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+    // Correct endpoint without 'models/' prefix duplication
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
