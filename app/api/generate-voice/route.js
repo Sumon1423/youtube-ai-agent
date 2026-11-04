@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export const maxDuration = 60; // ভয়েস জেনারেশনের জন্য টাইমআউট বাড়ানো হলো
+export const maxDuration = 60;
 
 export async function POST(req) {
   try {
@@ -16,7 +16,7 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'CARTESIA_API_KEY is missing in environment variables.' }, { status: 500 });
     }
 
-    // কার্টেসিয়া এআই এপিআই কল (Sonic মডেল)
+    // Using Cartesia's latest active model 'sonic'
     const response = await fetch('https://api.cartesia.ai/tts/bytes', {
       method: 'POST',
       headers: {
@@ -25,11 +25,11 @@ export async function POST(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model_id: 'sonic-english', // True Crime এর জন্য পারফেক্ট ইংলিশ ভয়েস মডেল
+        model_id: 'sonic', 
         transcript: script,
         voice: {
           mode: 'id',
-          id: voiceId || 'a0e99841-438c-4a64-b679-ae501e7d6091', // ডিফল্ট হাই-কোয়ালিটি ন্যারেশন ভয়েস আইডি
+          id: voiceId || 'a0e99841-438c-4a64-b679-ae501e7d6091',
         },
         output_format: {
           container: 'mp3',
@@ -44,7 +44,6 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: `Cartesia API error: ${errText}` }, { status: response.status });
     }
 
-    // অডিও বাইটগুলো রিসিভ করে বেসড টেন (Base64) বা সরাসরি অডিও স্ট্রিম হিসেবে পাঠানো
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
