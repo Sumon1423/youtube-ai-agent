@@ -1,15 +1,13 @@
-
 import { NextResponse } from 'next/server';
 
-const API_BASE =
-  'https://generativelanguage.googleapis.com/v1beta';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 const MAX_RETRIES = 2;
 
 const PREFERRED_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-pro',
 ];
 
 const sleep = (ms) =>
@@ -44,61 +42,51 @@ function isTemporaryError(status) {
 }
 
 async function fetchAvailableModels(apiKey) {
-  const response = await fetch(`${API_BASE}/models`, {
-    method: 'GET',
-    headers: {
-      'x-goog-api-key': apiKey,
-    },
-    cache: 'no-store',
-  });
+  try {
+    const response = await fetch(`${API_BASE}/models`, {
+      method: 'GET',
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+      cache: 'no-store',
+    });
 
-  const data = await response.json();
+    const data = await response.json();
 
-  if (!response.ok) {
-    const error = new Error(
-      data.error?.message || 'Unable to fetch Gemini models.'
-    );
+    if (!response.ok) {
+      // If fetching model list fails, fallback to preferred static models array
+      return PREFERRED_MODELS;
+    }
 
-    error.status = response.status;
-    throw error;
-  }
-
-  const availableModels = (data.models || [])
-    .filter((model) =>
-      model.supportedGenerationMethods?.includes(
-        'generateContent'
+    const availableModels = (data.models || [])
+      .filter((model) =>
+        model.supportedGenerationMethods?.includes('generateContent')
       )
-    )
-    .map((model) =>
-      model.name.replace(/^models\//, '')
+      .map((model) => model.name.replace(/^models\//, ''));
+
+    const preferred = PREFERRED_MODELS.filter((name) =>
+      availableModels.includes(name)
     );
 
-  const preferred = PREFERRED_MODELS.filter((name) =>
-    availableModels.includes(name)
-  );
-
-  const otherFlashModels = availableModels.filter(
-    (name) =>
-      /flash/i.test(name) && !preferred.includes(name)
-  );
-
-  const selected = [
-    ...preferred,
-    ...otherFlashModels,
-  ];
-
-  if (!selected.length) {
-    throw new Error(
-      'No available Gemini Flash model supports generateContent.'
+    const otherFlashModels = availableModels.filter(
+      (name) => /flash/i.test(name) && !preferred.includes(name)
     );
+
+    const selected = [...preferred, ...otherFlashModels];
+
+    if (!selected.length) {
+      return PREFERRED_MODELS;
+    }
+
+    return [...new Set(selected)];
+  } catch (err) {
+    // Fallback safely if network blocks model listing
+    return PREFERRED_MODELS;
   }
-
-  return [...new Set(selected)];
 }
 
 async function callGemini(apiKey, model, prompt) {
-  const url =
-    `${API_BASE}/models/${model}:generateContent`;
+  const url = `${API_BASE}/models/${model}:generateContent`;
 
   let lastError;
 
@@ -127,7 +115,6 @@ async function callGemini(apiKey, model, prompt) {
         cache: 'no-store',
       });
     } catch (error) {
-      // Network errors can be temporary.
       lastError = error;
 
       if (attempt < MAX_RETRIES) {
@@ -147,8 +134,7 @@ async function callGemini(apiKey, model, prompt) {
         .trim();
 
       if (!script) {
-        const finishReason =
-          data.candidates?.[0]?.finishReason;
+        const finishReason = data.candidates?.[0]?.finishReason;
 
         throw new Error(
           finishReason
@@ -161,24 +147,17 @@ async function callGemini(apiKey, model, prompt) {
     }
 
     const error = new Error(
-      data.error?.message ||
-        `Gemini API returned HTTP ${response.status}`
+      data.error?.message || `Gemini API returned HTTP ${response.status}`
     );
 
     error.status = response.status;
     lastError = error;
 
-    // Retry temporary errors on the same model.
-    if (
-      isTemporaryError(response.status) &&
-      attempt < MAX_RETRIES
-    ) {
+    if (isTemporaryError(response.status) && attempt < MAX_RETRIES) {
       await sleep(getRetryDelay(response, attempt));
       continue;
     }
 
-    // Non-temporary errors should go to model fallback
-    // without repeatedly calling the same model.
     throw error;
   }
 
@@ -190,9 +169,7 @@ export async function POST(req) {
     const body = await req.json();
 
     const title =
-      typeof body?.title === 'string'
-        ? body.title.trim()
-        : '';
+      typeof body?.title === 'string' ? body.title.trim() : '';
 
     if (!title) {
       return NextResponse.json(
@@ -203,10 +180,7 @@ export async function POST(req) {
 
     if (title.length > 500) {
       return NextResponse.json(
-        {
-          error:
-            'Video title must be 500 characters or less.',
-        },
+        { error: 'Video title must be 500 characters or less.' },
         { status: 400 }
       );
     }
@@ -215,10 +189,7 @@ export async function POST(req) {
 
     if (!apiKey) {
       return NextResponse.json(
-        {
-          error:
-            'GEMINI_API_KEY is missing in Vercel environment variables.',
-        },
+        { error: 'GEMINI_API_KEY is missing in Vercel environment variables.' },
         { status: 500 }
       );
     }
@@ -280,11 +251,7 @@ Return only the script.
 
     for (const model of models) {
       try {
-        const script = await callGemini(
-          apiKey,
-          model,
-          prompt
-        );
+        const script = await callGemini(apiKey, model, prompt);
 
         return NextResponse.json({
           success: true,
@@ -294,14 +261,8 @@ Return only the script.
       } catch (error) {
         lastError = error;
 
-        console.error(
-          `Gemini model ${model} failed:`,
-          error.message
-        );
+        console.error(`Gemini model ${model} failed:`, error.message);
 
-        // Try another model for:
-        // model not found, unsupported model,
-        // temporary server errors, or capacity errors.
         if (
           error.status === 400 ||
           error.status === 404 ||
@@ -314,8 +275,6 @@ Return only the script.
           continue;
         }
 
-        // Authentication, permission, and other
-        // non-recoverable errors should stop here.
         throw error;
       }
     }
@@ -324,14 +283,12 @@ Return only the script.
       lastError?.status === 429
         ? 429
         : lastError?.status === 503
-          ? 503
-          : 502;
+        ? 503
+        : 502;
 
     throw Object.assign(
       new Error(
-        `All available Gemini models failed. ${
-          lastError?.message || ''
-        }`
+        `All available Gemini models failed. ${lastError?.message || ''}`
       ),
       { status }
     );
@@ -341,9 +298,7 @@ Return only the script.
     return NextResponse.json(
       {
         success: false,
-        error:
-          error.message ||
-          'Gemini AI script generation failed.',
+        error: error.message || 'Gemini AI script generation failed.',
       },
       {
         status: error.status || 500,
