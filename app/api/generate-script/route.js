@@ -18,7 +18,8 @@ export async function POST(req) {
 
     const promptText = `You are an expert YouTube True Crime scriptwriter for viral US Shorts (50-60s). Write a tense, high-retention script with [Visual/B-Roll Cues] included for the topic: "${title}".`;
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${geminiApiKey}`;
+    // Using gemini-1.5-flash with v1beta endpoint which supports generateContent natively
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
 
     const geminiResponse = await fetch(endpoint, {
       method: 'POST',
