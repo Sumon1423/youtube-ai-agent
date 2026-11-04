@@ -8,35 +8,45 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Script text is required for voice generation' }, { status: 400 });
     }
 
-    // ElevenLabs API integration for professional narration (e.g., deep true crime voice like Marcus)
-    // Default to a popular deep narration voice ID if not provided
-    const selectedVoiceId = voiceId || '21m00Tcm4TlvDq8ikWAM'; 
+    // Cartesia AI API Integration for True Crime Narration
+    const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY;
+    if (!CARTESIA_API_KEY) {
+      return NextResponse.json({ error: 'Cartesia API Key is missing in environment variables.' }, { status: 500 });
+    }
 
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`, {
+    // Default Cartesia Voice ID for deep narration (you can update or select via frontend)
+    const selectedVoiceId = voiceId || 'a0e99841-438c-4a64-b679-ae501e7d6091'; 
+
+    const response = await fetch('https://api.cartesia.ai/tts/bytes', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'xi-api-key': process.env.ELEVENLABS_API_KEY
+        'X-API-Key': CARTESIA_API_KEY,
+        'Cartesia-Version': '2024-06-10'
       },
       body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.75,
-          similarity_boost: 0.85
+        model_id: 'sonic-english',
+        transcript: text,
+        voice: {
+          mode: 'id',
+          id: selectedVoiceId
+        },
+        output_format: {
+          container: 'mp3',
+          encoding: 'mp3',
+          sample_rate: 44100
         }
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json({ error: errorData.detail?.message || 'ElevenLabs voice generation failed' }, { status: 500 });
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json({ error: errorData.message || 'Cartesia AI voice generation failed' }, { status: 500 });
     }
 
-    // Convert audio stream to array buffer / base64 or return success URL
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
-    const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
+    const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
 
     return NextResponse.json({ success: true, audioUrl: audioUrl });
   } catch (error) {
