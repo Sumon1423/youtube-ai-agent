@@ -9,6 +9,7 @@ export default function ScriptStudioPage() {
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [scriptContent, setScriptContent] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +33,26 @@ export default function ScriptStudioPage() {
     initScriptStudio();
   }, [router]);
 
+  // প্রগ্রেস বার স্মুথলি বাড়ানোর ফাংশন
+  useEffect(() => {
+    let interval;
+    if (generating) {
+      setProgress(10);
+      interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(interval);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 300);
+    } else {
+      setProgress(100);
+    }
+    return () => clearInterval(interval);
+  }, [generating]);
+
   const handleGenerateGeminiScript = async () => {
     if (!selectedIdea) {
       alert("No active idea selected! Please select an idea first.");
@@ -39,6 +60,8 @@ export default function ScriptStudioPage() {
     }
 
     setGenerating(true);
+    setProgress(10);
+
     try {
       const res = await fetch('/api/generate-script', {
         method: 'POST',
@@ -54,9 +77,10 @@ export default function ScriptStudioPage() {
 
       const data = await res.json();
       if (data.success) {
+        setProgress(100);
         setScriptContent(data.script);
         const updatedIdea = { ...selectedIdea, script: data.script };
-        localStorage.setItem("selected_idea", JSON.stringify(updatedIndex = updatedIdea));
+        localStorage.setItem("selected_idea", JSON.stringify(updatedIdea));
       } else {
         alert("Error generating script: " + data.error);
       }
@@ -99,7 +123,20 @@ export default function ScriptStudioPage() {
         {generating ? "Gemini AI is writing script..." : "🤖 Generate Script with Gemini AI"}
       </button>
 
-      {scriptContent && (
+      {/* আকর্ষণীয় প্রগ্রেস বার */}
+      {generating && (
+        <div className="progress-box">
+          <div className="progress-info">
+            <span>Crafting viral script & B-roll cues...</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+
+      {scriptContent && !generating && (
         <div className="script-output-box">
           <h3>Generated Script & Visual Cues:</h3>
           <textarea 
@@ -123,7 +160,15 @@ export default function ScriptStudioPage() {
         .page-header h1 { font-size: 24px; margin: 4px 0; }
         .page-header p { color: #8da2bb; font-size: 12px; margin: 0; }
         .active-idea-card { padding: 12px; background: rgba(37, 216, 232, 0.08); border: 1px solid rgba(37, 216, 232, 0.2); border-radius: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 2px; color: #25d8e8; }
-        .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; transition: opacity 0.2s; }
+        .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        /* প্রগ্রেস বারের ডিজাইন */
+        .progress-box { background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(37, 216, 232, 0.3); padding: 14px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .progress-info { display: flex; justify-content: space-between; font-size: 11px; color: #25d8e8; font-weight: bold; }
+        .progress-track { width: 100%; height: 6px; background: #07111e; border-radius: 3px; overflow: hidden; border: 1px solid rgba(112, 165, 220, 0.2); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #25d8e8, #3298ff); border-radius: 3px; transition: width 0.3s ease-in-out; }
+
         .script-output-box { display: flex; flex-direction: column; gap: 10px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 16px; border-radius: 12px; }
         .script-output-box h3 { font-size: 13px; color: #45dfaa; margin: 0; }
         .script-textarea { width: 100%; background: #07111e; color: #fff; border: 1px solid rgba(112, 165, 220, 0.3); border-radius: 8px; padding: 12px; font-size: 12px; font-family: monospace; resize: vertical; }
