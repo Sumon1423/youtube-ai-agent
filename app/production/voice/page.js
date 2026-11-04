@@ -6,11 +6,19 @@ import { supabase } from "../../../lib/supabase";
 
 export default function VoiceStudioPage() {
   const router = useRouter();
-  const [selectedIdea, setSelectedIdea] = useState(null);
-  const [scriptText, setScriptText] = useState("");
-  const [generatingVoice, setGeneratingVoice] = useState(false);
-  const [audioUrl, setAudioUrl] = useState(null);
+  const [scriptData, setScriptData] = useState("");
+  const [selectedVoice, setSelectedVoice] = useState("a0e99841-438c-4a64-b679-ae501e7d6091");
+  const [generating, setGenerating] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState(true);
+  const [consoleLogs, setConsoleLogs] = useState([]);
+
+  const voiceLogs = [
+    "Connecting to Cartesia AI Sonic Engine...",
+    "Optimizing vocal tone for True Crime tension...",
+    "Synthesizing high-fidelity audio stream...",
+    "Finalizing MP3 voice-over package..."
+  ];
 
   useEffect(() => {
     async function initVoiceStudio() {
@@ -23,12 +31,8 @@ export default function VoiceStudioPage() {
       const savedIdea = localStorage.getItem("selected_idea");
       if (savedIdea) {
         const parsed = JSON.parse(savedIdea);
-        setSelectedIdea(parsed);
         if (parsed.script) {
-          setScriptText(parsed.script);
-        }
-        if (parsed.audioUrl) {
-          setAudioUrl(parsed.audioUrl);
+          setScriptData(parsed.script);
         }
       }
       setLoading(false);
@@ -36,32 +40,48 @@ export default function VoiceStudioPage() {
     initVoiceStudio();
   }, [router]);
 
-  const handleGenerateCartesiaVoice = async () => {
-    if (!scriptText) {
-      alert("No script found! Please generate a script in Script Studio first.");
+  useEffect(() => {
+    let timer;
+    if (generating) {
+      setConsoleLogs([]);
+      let index = 0;
+      timer = setInterval(() => {
+        if (index < voiceLogs.length) {
+          setConsoleLogs((prev) => [...prev, voiceLogs[index]]);
+          index++;
+        }
+      }, 800);
+    }
+    return () => clearInterval(timer);
+  }, [generating]);
+
+  const handleGenerateVoice = async () => {
+    if (!scriptData) {
+      alert("No script found! Please generate a script first.");
       return;
     }
 
-    setGeneratingVoice(true);
+    setGenerating(true);
+    setAudioUrl("");
+
     try {
       const res = await fetch('/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: scriptText })
+        body: JSON.stringify({ script: scriptData, voiceId: selectedVoice })
       });
 
       const data = await res.json();
+
       if (data.success) {
-        setAudioUrl(data.audioUrl);
-        const updatedIdea = { ...selectedIdea, script: scriptText, audioUrl: data.audioUrl };
-        localStorage.setItem("selected_idea", JSON.stringify(updatedIdea));
+        setAudioUrl(data.audio);
       } else {
-        alert("Error generating Cartesia voiceover: " + data.error);
+        alert("Voice Generation Error: " + data.error);
       }
     } catch (err) {
-      alert("Network error: " + err.message);
+      alert("Network Error: " + err.message);
     } finally {
-      setGeneratingVoice(false);
+      setGenerating(false);
     }
   };
 
@@ -81,40 +101,57 @@ export default function VoiceStudioPage() {
       </button>
 
       <div className="page-header">
-        <span className="eyebrow">CARTESIA AI VOICE ENGINE</span>
+        <span className="eyebrow">CARTESIA AI SONIC ENGINE</span>
         <h1>Voice Studio 🎙️</h1>
-        <p>Synthesize ultra-realistic deep true-crime narration using Cartesia AI Sonic.</p>
+        <p>Convert your True Crime scripts into ultra-realistic AI voice-overs.</p>
       </div>
 
-      {selectedIdea && (
-        <div className="active-idea-card">
-          <span>Active Project:</span>
-          <strong>{selectedIdea.title}</strong>
+      <div className="control-panel">
+        <label>Select Narrator Voice:</label>
+        <select 
+          value={selectedVoice} 
+          onChange={(e) => setSelectedVoice(e.target.value)}
+          className="voice-select"
+        >
+          <option value="a0e99841-438c-4a64-b679-ae501e7d6091">British Male (Deep & Suspenseful)</option>
+          <option value="694f9389-aac1-45b6-b726-9d9369183238">American Narrator (True Crime Tone)</option>
+          <option value="79a125e8-cd45-4c13-8a67-188112f4d22e">Cinematic Dark Voice</option>
+        </select>
+      </div>
+
+      <button className="btn-generate" onClick={handleGenerateVoice} disabled={generating}>
+        {generating ? "Synthesizing Audio..." : "🔊 Generate Voice-Over with Cartesia AI"}
+      </button>
+
+      {generating && (
+        <div className="terminal-box">
+          <div className="terminal-header">
+            <span className="dot red"></span>
+            <span className="dot yellow"></span>
+            <span className="dot green"></span>
+            <span className="terminal-title">cartesia-sonic@creatoros:~</span>
+          </div>
+          <div className="terminal-body">
+            {consoleLogs.map((log, idx) => (
+              <div key={idx} className="terminal-line">
+                <span className="prompt-symbol">&gt;</span> {log}
+              </div>
+            ))}
+            <div className="cursor-blink">_</div>
+          </div>
         </div>
       )}
 
-      <div className="input-section">
-        <label>Script to Synthesize:</label>
-        <textarea 
-          value={scriptText} 
-          onChange={(e) => setScriptText(e.target.value)}
-          rows={8}
-          className="script-textarea"
-        />
-      </div>
-
-      <button className="btn-generate" onClick={handleGenerateCartesiaVoice} disabled={generatingVoice}>
-        {generatingVoice ? "Cartesia AI is synthesizing narration..." : "🔊 Generate Cartesia AI Voiceover"}
-      </button>
-
-      {audioUrl && (
+      {audioUrl && !generating && (
         <div className="audio-output-box">
-          <h3>Cartesia Narration Audio Ready 🎉</h3>
-          <audio controls src={audioUrl} style={{ width: "100%", marginTop: "8px" }} />
-          
+          <h3>Generated Voice-Over Audio:</h3>
+          <audio controls src={audioUrl} className="audio-player" />
           <div className="action-buttons">
+            <a href={audioUrl} download="true-crime-voiceover.mp3" className="btn-download">
+              ⬇ Download MP3
+            </a>
             <button className="btn-proceed" onClick={() => router.push("/production/editor")}>
-              Proceed to AI Editor →
+              Proceed to AI Video Editor →
             </button>
           </div>
         </div>
@@ -126,14 +163,30 @@ export default function VoiceStudioPage() {
         .eyebrow { color: #52b5ff; font-size: 10px; letter-spacing: 1.5px; font-weight: 800; }
         .page-header h1 { font-size: 24px; margin: 4px 0; }
         .page-header p { color: #8da2bb; font-size: 12px; margin: 0; }
-        .active-idea-card { padding: 12px; background: rgba(37, 216, 232, 0.08); border: 1px solid rgba(37, 216, 232, 0.2); border-radius: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 2px; color: #25d8e8; }
-        .input-section { display: flex; flex-direction: column; gap: 6px; }
-        .input-section label { font-size: 11px; color: #8da2bb; font-weight: bold; }
-        .script-textarea { width: 100%; background: #07111e; color: #fff; border: 1px solid rgba(112, 165, 220, 0.3); border-radius: 8px; padding: 12px; font-size: 12px; font-family: monospace; resize: vertical; }
-        .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; }
-        .audio-output-box { display: flex; flex-direction: column; gap: 10px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 16px; border-radius: 12px; }
+        .control-panel { display: flex; flex-direction: column; gap: 6px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 14px; border-radius: 10px; }
+        .control-panel label { font-size: 11px; color: #8da2bb; }
+        .voice-select { background: #07111e; color: #fff; border: 1px solid rgba(112, 165, 220, 0.3); border-radius: 8px; padding: 10px; font-size: 12px; }
+        .btn-generate { background: #25d8e8; color: #07111e; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 12px; transition: opacity 0.2s; }
+        .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        .terminal-box { background: #030812; border: 1px solid rgba(37, 216, 232, 0.4); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-family: monospace; }
+        .terminal-header { background: #0b162c; padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .dot { width: 9px; height: 9px; border-radius: 50%; }
+        .red { background: #ff5f56; }
+        .yellow { background: #ffbd2e; }
+        .green { background: #27c93f; }
+        .terminal-title { font-size: 10px; color: #8da2bb; margin-left: 6px; }
+        .terminal-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; min-height: 100px; }
+        .terminal-line { font-size: 11px; color: #45dfaa; display: flex; gap: 6px; }
+        .prompt-symbol { color: #25d8e8; font-weight: bold; }
+        .cursor-blink { font-size: 12px; color: #25d8e8; animation: blink 1s infinite; width: fit-content; }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+        .audio-output-box { display: flex; flex-direction: column; gap: 12px; background: rgba(15, 27, 44, 0.7); border: 1px solid rgba(112, 165, 220, 0.16); padding: 16px; border-radius: 12px; }
         .audio-output-box h3 { font-size: 13px; color: #45dfaa; margin: 0; }
-        .action-buttons { display: flex; justify-content: flex-end; margin-top: 4px; }
+        .audio-player { width: 100%; border-radius: 8px; }
+        .action-buttons { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+        .btn-download { background: rgba(37, 216, 232, 0.2); color: #25d8e8; border: 1px solid rgba(37, 216, 232, 0.4); padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: bold; text-decoration: none; }
         .btn-proceed { background: rgba(50, 152, 255, 0.2); color: #52b5ff; border: 1px solid rgba(50, 152, 255, 0.4); padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; }
         .page-loading { text-align: center; color: #8da2bb; font-size: 11px; padding: 30px; }
         .spinner { width: 24px; height: 24px; border: 2px solid rgba(82, 144, 201, 0.22); border-top-color: #25d8e8; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 10px; }
