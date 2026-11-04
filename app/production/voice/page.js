@@ -7,16 +7,16 @@ import { supabase } from "../../../lib/supabase";
 export default function VoiceStudioPage() {
   const router = useRouter();
   const [scriptData, setScriptData] = useState("");
-  const [selectedVoice, setSelectedVoice] = useState("a0e99841-438c-4a64-b679-ae501e7d6091");
+  const [selectedVoice, setSelectedVoice] = useState("en-US-ChristopherNeural");
   const [generating, setGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [consoleLogs, setConsoleLogs] = useState([]);
 
   const voiceLogs = [
-    "Connecting to Cartesia AI Sonic Engine...",
-    "Optimizing vocal tone for True Crime tension...",
-    "Synthesizing high-fidelity audio stream...",
+    "Connecting to Edge TTS Neural Engine...",
+    "Configuring deep cinematic True Crime tone...",
+    "Synthesizing high-quality natural audio...",
     "Finalizing MP3 voice-over package..."
   ];
 
@@ -50,7 +50,7 @@ export default function VoiceStudioPage() {
           setConsoleLogs((prev) => [...prev, voiceLogs[index]]);
           index++;
         }
-      }, 800);
+      }, 700);
     }
     return () => clearInterval(timer);
   }, [generating]);
@@ -101,9 +101,9 @@ export default function VoiceStudioPage() {
       </button>
 
       <div className="page-header">
-        <span className="eyebrow">CARTESIA AI SONIC ENGINE</span>
+        <span className="eyebrow">MICROSOFT EDGE NEURAL ENGINE</span>
         <h1>Voice Studio 🎙️</h1>
-        <p>Convert your True Crime scripts into ultra-realistic AI voice-overs.</p>
+        <p>Convert your True Crime scripts into ultra-realistic free AI voice-overs.</p>
       </div>
 
       <div className="control-panel">
@@ -113,14 +113,15 @@ export default function VoiceStudioPage() {
           onChange={(e) => setSelectedVoice(e.target.value)}
           className="voice-select"
         >
-          <option value="a0e99841-438c-4a64-b679-ae501e7d6091">British Male (Deep & Suspenseful)</option>
-          <option value="694f9389-aac1-45b6-b726-9d9369183238">American Narrator (True Crime Tone)</option>
-          <option value="79a125e8-cd45-4c13-8a67-188112f4d22e">Cinematic Dark Voice</option>
+          <option value="en-US-ChristopherNeural">Christopher (Deep & Suspenseful Male)</option>
+          <option value="en-US-GuyNeural">Guy (Professional Narrator)</option>
+          <option value="en-US-SteffanNeural">Steffan (Cinematic Dark Voice)</option>
+          <option value="en-US-AriaNeural">Aria (Expressive Dynamic Voice)</option>
         </select>
       </div>
 
       <button className="btn-generate" onClick={handleGenerateVoice} disabled={generating}>
-        {generating ? "Synthesizing Audio..." : "🔊 Generate Voice-Over with Cartesia AI"}
+        {generating ? "Synthesizing Audio..." : "🔊 Generate Voice-Over with Edge TTS"}
       </button>
 
       {generating && (
@@ -129,7 +130,7 @@ export default function VoiceStudioPage() {
             <span className="dot red"></span>
             <span className="dot yellow"></span>
             <span className="dot green"></span>
-            <span className="terminal-title">cartesia-sonic@creatoros:~</span>
+            <span className="terminal-title">edge-tts@creatoros:~</span>
           </div>
           <div className="terminal-body">
             {consoleLogs.map((log, idx) => (
