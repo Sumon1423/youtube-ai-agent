@@ -16,40 +16,53 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'CARTESIA_API_KEY is missing in environment variables.' }, { status: 500 });
     }
 
-    // Using Cartesia's current stable sonic model
-    const response = await fetch('https://api.cartesia.ai/tts/bytes', {
+    // Cartesia Sonic API Payload
+    const payload = {
+      model_id: 'sonic',
+      transcript: script,
+      voice: {
+        mode: 'id',
+        id: voiceId || 'a0e99841-438c-4a64-b679-ae501e7d6091',
+      },
+      output_format: {
+        container: 'mp3',
+        encoding: 'mp3',
+        sample_rate: 44100,
+      },
+    };
+
+    let response = await fetch('https://api.cartesia.ai/tts/bytes', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${cartesiaApiKey}`,
         'Cartesia-Version': '2024-06-10',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model_id: 'sonic-english', 
-        transcript: script,
-        voice: {
-          mode: 'id',
-          id: voiceId || 'a0e99841-438c-4a64-b679-ae501e7d6091',
-        },
-        output_format: {
-          container: 'mp3',
-          encoding: 'mp3',
-          sample_rate: 44100,
-        },
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const data = await response.json().catch(() => ({}));
+    // যদি প্রথমবারে এরর দেয়, তবে মডেল নাম 'sonic-english' দিয়ে ফলব্যাক ট্রাই করবে
+    if (!response.ok) {
+      payload.model_id = 'sonic-english';
+      response = await fetch('https://api.cartesia.ai/tts/bytes', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cartesiaApiKey}`,
+          'Cartesia-Version': '2024-06-10',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    }
 
     if (!response.ok) {
+      const errText = await response.text();
       return NextResponse.json({ 
         success: false, 
-        error: data.message || data.error || `Cartesia API error status ${response.status}` 
+        error: `Cartesia API error: ${errText || response.statusText}` 
       }, { status: response.status });
     }
 
-    // Since /tts/bytes returns binary buffer when successful
-    // Let's handle it safely by checking response type or fallback
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
