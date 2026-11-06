@@ -1,0 +1,21 @@
+import { NextResponse } from 'next/server';
+
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { title, script, audioUrl } = body;
+
+    // এখানে আপনার স্ক্রিপ্ট, টাইটেল এবং অডিও ফাইল রিসিভ হয়ে ব্যাকএন্ড প্রসেসিং শুরু হবে
+    console.log("Processing Video for:", title);
+
+    // সফলভাবে রেন্ডারিং শুরু হওয়ার রেসপন্স (ডেমো লিংক বা ভিডিও রেন্ডার হওয়ার পর রিয়েল লিংক)
+    return NextResponse.json({
+      success: true,
+      videoUrl: "https://example.com/rendered-true-crime-short.mp4" 
+    });
+
+  } catch (error) {
+    console.error("Backend Error:", error);
+    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+  }
+}
