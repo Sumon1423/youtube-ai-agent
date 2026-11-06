@@ -1,24 +1,20 @@
 import { NextResponse } from 'next/server';
 
-export const maxDuration = 60;
-
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const { script, audioUrl, backgroundTrack } = await req.json();
+    const body = await request.json();
+    const { title, script, audioUrl, assets } = body;
 
-    if (!script || !audioUrl) {
-      return NextResponse.json({ success: false, error: 'Script and Audio are required for rendering.' }, { status: 400 });
-    }
-
-    // এখানে Remotion ইঞ্জিন ব্যাকগ্রাউন্ডে ভিডিও রেন্ডার করে ফাইনাল আউটপুট তৈরি করবে
+    // এখানে ৩০-৬০ সেকেন্ডের ফুল ভিডিও মোশন গ্রাফিক্স পাইপলাইনে রেন্ডার হওয়ার রিকোয়েস্ট হ্যান্ডেল হবে
 
     return NextResponse.json({
       success: true,
-      message: 'Video rendering sequence initiated successfully via Remotion engine.',
-      downloadUrl: audioUrl 
+      message: "Motion Graphics video rendering initiated successfully.",
+      videoUrl: "https://example.com/rendered-true-crime-short.mp4"
     });
 
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error("Render Video Error:", error);
+    return NextResponse.json({ success: false, error: "Failed to render video." }, { status: 500 });
   }
 }
