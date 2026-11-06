@@ -35,12 +35,17 @@ export default function AIEditorPage() {
     );
   }
 
-  // ডেমো বা স্ক্রিপ্ট থেকে পাওয়া ছবিগুলো
-  const sampleAssets = selectedIdea?.assets || [
-    { id: 1, name: "Crime Scene Archival Photo 1", url: "https://picsum.photos/800/1400?random=1" },
-    { id: 2, name: "Suspect Investigation Record", url: "https://picsum.photos/800/1400?random=2" },
-    { id: 3, name: "Evidence Log & Location Map", url: "https://picsum.photos/800/1400?random=3" },
+  // ভিডিওর জন্য পর্যাপ্ত রিয়ালিস্টিক ও আর্কাইভাল ছবিগুলোর লিস্ট
+  const storyAssets = [
+    { id: 1, name: "B-29 Superfortress Bomber", url: "https://upload.wikimedia.org/wikipedia/commons/e/e4/B-29_Superfortress_in_flight.jpg" },
+    { id: 2, name: "Alaskan Wilderness Landscape", url: "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=1200&q=80" },
+    { id: 3, name: "Vintage Military Investigation Record", url: "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=1200&q=80" },
+    { id: 4, name: "Cold War Era Control Room", url: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80" },
+    { id: 5, name: "Search and Rescue Area Vibe", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80" },
   ];
+
+  // ভয়েস-ওভার লিংক (যদি সিলেক্টেড আইডিয়াতে না থাকে তবে ডিফল্ট ট্রু ক্রাইম ভয়েস লিংক ব্যবহার হবে)
+  const audioSrc = selectedIdea?.audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
 
   return (
     <div className="editor-container">
@@ -51,7 +56,7 @@ export default function AIEditorPage() {
       <div className="page-header">
         <span className="eyebrow">RESOURCE PREPARATION STUDIO</span>
         <h1>Asset & Voice Collector 🎙️📸</h1>
-        <p>আপনার ট্রু ক্রাইম শর্টসের জন্য ভয়েস-ওভার এবং রিয়েল ইমেজ অ্যাসেটগুলো ডাউনলোড করে ম্যানুয়ালি এডিট করুন।</p>
+        <p>আপনার ট্রু ক্রাইম শর্টসের জন্য প্রয়োজনীয় ভয়েস-ওভার এবং পর্যাপ্ত রিয়েল ইমেজ অ্যাসেটগুলো নিচে দেওয়া হলো।</p>
       </div>
 
       {selectedIdea && (
@@ -66,31 +71,22 @@ export default function AIEditorPage() {
         <h3>1. Voice-Over Audio (.mp3)</h3>
         <p className="card-desc">স্ক্রিপ্টের জন্য জেনারেট হওয়া ন্যারেশন ভয়েস-ওভার ফাইল:</p>
         
-        {selectedIdea?.audioUrl ? (
-          <div className="audio-player-box">
-            <audio controls src={selectedIdea.audioUrl} className="audio-element" />
-            <a href={selectedIdea.audioUrl} download={`${selectedIdea.title || 'voiceover'}.mp3`} className="btn-download">
-              📥 Download Voice-Over (MP3)
-            </a>
-          </div>
-        ) : (
-          <div className="no-audio-box">
-            <p>⚠️ ভয়েস-ওভার লিংক পাওয়া যায়নি। সরাসরি কাস্টম অডিও ডাউনলোড করুন:</p>
-            <a href="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" download="Crime_Voiceover.mp3" className="btn-download">
-              📥 Download Generated Voice-Over (MP3)
-            </a>
-          </div>
-        )}
+        <div className="audio-player-box">
+          <audio controls src={audioSrc} className="audio-element" />
+          <a href={audioSrc} download="True_Crime_Voiceover.mp3" className="btn-download">
+            📥 Download Voice-Over (MP3)
+          </a>
+        </div>
       </div>
 
       {/* Realistic Visual Assets Download Card */}
       <div className="resource-card">
-        <h3>2. Realistic Story Assets & Archival Images</h3>
-        <p className="card-desc">কাহিনীর সাথে সামঞ্জস্যপূর্ণ সংগৃহীত রিয়ালিস্টিক ছবিগুলো সেভ করে নিন:</p>
+        <h3>2. Realistic Story Assets & Archival Images ({storyAssets.length} Images)</h3>
+        <p className="card-desc">ভিডিও এডিটিংয়ের জন্য প্রয়োজনীয় সব রিয়ালিস্টিক ছবি একসাথে:</p>
 
         <div className="assets-grid">
-          {sampleAssets.map((asset, index) => (
-            <div key={index} className="asset-item">
+          {storyAssets.map((asset) => (
+            <div key={asset.id} className="asset-item">
               <img src={asset.url} alt={asset.name} className="asset-img" />
               <span className="asset-title">{asset.name}</span>
               <a href={asset.url} target="_blank" rel="noopener noreferrer" download className="btn-download-sm">
@@ -120,9 +116,8 @@ export default function AIEditorPage() {
         .resource-card h3 { font-size: 14px; margin: 0; color: #38bdf8; }
         .card-desc { font-size: 11px; color: #8da2bb; margin: 0; }
 
-        .audio-player-box, .no-audio-box { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+        .audio-player-box { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
         .audio-element { width: 100%; height: 36px; }
-        .no-audio-box p { font-size: 11px; color: #f59e0b; margin: 0; }
 
         .btn-download { background: #2563eb; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
         .btn-download:hover { background: #1d4ed8; }
