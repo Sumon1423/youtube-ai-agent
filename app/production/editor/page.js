@@ -35,7 +35,7 @@ export default function AIEditorPage() {
     );
   }
 
-  // ভিডিওর জন্য পর্যাপ্ত রিয়ালিস্টিক ও আর্কাইভাল ছবিগুলোর লিস্ট
+  // ভিডিওর জন্য রিয়ালিস্টিক ও আর্কাইভাল ছবিগুলোর লিস্ট
   const storyAssets = [
     { id: 1, name: "B-29 Superfortress Bomber", url: "https://upload.wikimedia.org/wikipedia/commons/e/e4/B-29_Superfortress_in_flight.jpg" },
     { id: 2, name: "Alaskan Wilderness Landscape", url: "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=1200&q=80" },
@@ -44,8 +44,41 @@ export default function AIEditorPage() {
     { id: 5, name: "Search and Rescue Area Vibe", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80" },
   ];
 
-  // ভয়েস-ওভার লিংক (যদি সিলেক্টেড আইডিয়াতে না থাকে তবে ডিফল্ট ট্রু ক্রাইম ভয়েস লিংক ব্যবহার হবে)
+  // ভয়েস-ওভার লিংক
   const audioSrc = selectedIdea?.audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+
+  // এসআরটি (SRT) সাবটাইটেল কন্টেন্ট জেনারেট করার ফাংশন
+  const handleDownloadSRT = () => {
+    const srtContent = `1
+00:00:00,000 --> 00:00:03,500
+The Unsolved Mystery of the Missing B-29 Bomber.
+
+2
+00:00:03,500 --> 00:00:07,800
+In January 1948, a massive military aircraft vanished over Alaska.
+
+3
+00:00:07,800 --> 00:00:12,200
+The B-29 Superfortress was on a routine training mission when radar contact was lost.
+
+4
+00:00:12,200 --> 00:00:17,000
+Rescue teams searched the frozen wilderness, but found no trace of major wreckage for days.
+
+5
+00:00:17,000 --> 00:00:21,500
+What happened to the crew in the freezing polar storms remains a chilling mystery.`;
+
+    const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "subtitle.srt";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="editor-container">
@@ -55,8 +88,8 @@ export default function AIEditorPage() {
 
       <div className="page-header">
         <span className="eyebrow">RESOURCE PREPARATION STUDIO</span>
-        <h1>Asset & Voice Collector 🎙️📸</h1>
-        <p>আপনার ট্রু ক্রাইম শর্টসের জন্য প্রয়োজনীয় ভয়েস-ওভার এবং পর্যাপ্ত রিয়েল ইমেজ অ্যাসেটগুলো নিচে দেওয়া হলো।</p>
+        <h1>Asset, Voice & SRT Collector 🎙️📝</h1>
+        <p>আপনার ট্রু ক্রাইম শর্টসের জন্য ভয়েস-ওভার, এসআরটি সাবটাইটেল ফাইল এবং রিয়ালিস্টিক ইমেজ অ্যাসেটগুলো নিচে দেওয়া হলো।</p>
       </div>
 
       {selectedIdea && (
@@ -66,20 +99,25 @@ export default function AIEditorPage() {
         </div>
       )}
 
-      {/* Voice-Over Audio Download Card */}
+      {/* 1. Voice-Over & SRT Download Card */}
       <div className="resource-card">
-        <h3>1. Voice-Over Audio (.mp3)</h3>
-        <p className="card-desc">স্ক্রিপ্টের জন্য জেনারেট হওয়া ন্যারেশন ভয়েস-ওভার ফাইল:</p>
+        <h3>1. Voice-Over Audio (.mp3) & Subtitle (.srt)</h3>
+        <p className="card-desc">নারেশন ভয়েস এবং ভিডিওর সাবটাইটেল ফাইল ডাউনলোড করুন:</p>
         
         <div className="audio-player-box">
           <audio controls src={audioSrc} className="audio-element" />
-          <a href={audioSrc} download="True_Crime_Voiceover.mp3" className="btn-download">
-            📥 Download Voice-Over (MP3)
-          </a>
+          <div className="btn-row">
+            <a href={audioSrc} download="True_Crime_Voiceover.mp3" className="btn-download">
+              📥 Download Voice (MP3)
+            </a>
+            <button onClick={handleDownloadSRT} className="btn-download-srt">
+              📝 Download Subtitle (.srt)
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Realistic Visual Assets Download Card */}
+      {/* 2. Realistic Visual Assets Download Card */}
       <div className="resource-card">
         <h3>2. Realistic Story Assets & Archival Images ({storyAssets.length} Images)</h3>
         <p className="card-desc">ভিডিও এডিটিংয়ের জন্য প্রয়োজনীয় সব রিয়ালিস্টিক ছবি একসাথে:</p>
@@ -118,9 +156,13 @@ export default function AIEditorPage() {
 
         .audio-player-box { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
         .audio-element { width: 100%; height: 36px; }
+        .btn-row { display: flex; gap: 8px; }
 
-        .btn-download { background: #2563eb; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
+        .btn-download { flex: 1; background: #2563eb; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
         .btn-download:hover { background: #1d4ed8; }
+
+        .btn-download-srt { flex: 1; background: #059669; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-download-srt:hover { background: #047857; }
 
         .assets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 8px; }
         .asset-item { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
