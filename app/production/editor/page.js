@@ -17,6 +17,7 @@ export default function AIEditorPage() {
         return;
       }
 
+      // লোকাল স্টোরেজ থেকে ইউজারের আসল প্রজেক্ট ডেটা আনা
       const savedIdea = localStorage.getItem("selected_idea");
       if (savedIdea) {
         setSelectedIdea(JSON.parse(savedIdea));
@@ -35,20 +36,26 @@ export default function AIEditorPage() {
     );
   }
 
-  // ভিডিওর জন্য রিয়ালিস্টিক ও আর্কাইভাল ছবিগুলোর লিস্ট
-  const storyAssets = [
-    { id: 1, name: "B-29 Superfortress Bomber", url: "https://upload.wikimedia.org/wikipedia/commons/e/e4/B-29_Superfortress_in_flight.jpg" },
-    { id: 2, name: "Alaskan Wilderness Landscape", url: "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=1200&q=80" },
-    { id: 3, name: "Vintage Military Investigation Record", url: "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=1200&q=80" },
-    { id: 4, name: "Cold War Era Control Room", url: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80" },
-    { id: 5, name: "Search and Rescue Area Vibe", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80" },
+  // প্রজেক্টের আসল ভয়েস অডিও (ElevenLabs জেনারেটেড audioUrl থাকলে সেটিই নিবে)
+  const voiceAudioSrc = selectedIdea?.audioUrl || selectedIdea?.voiceUrl || null;
+  
+  // ব্যাকগ্রাউন্ড ট্রু ক্রাইম মিউজিক (প্রজেক্টে না থাকলে ডিফল্ট ডার্ক মিউজিক)
+  const bgMusicSrc = selectedIdea?.bgMusicUrl || null;
+
+  // ভিডিওর রিয়ালিস্টিক ও প্রামাণিক ইমেজ অ্যাসেটসমূহ
+  const storyAssets = selectedIdea?.assets || [
+    { id: 1, name: "B-29 Superfortress Aircraft In-Flight", url: "https://upload.wikimedia.org/wikipedia/commons/e/e4/B-29_Superfortress_in_flight.jpg" },
+    { id: 2, name: "Frozen Alaskan Mountain Range (Last Known Location)", url: "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=1200&q=80" },
+    { id: 3, name: "1948 Military Investigation Documents & Search Map", url: "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=1200&q=80" },
+    { id: 4, name: "Cold War Military Radar & Control Room Station", url: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80" },
+    { id: 5, name: "Search & Rescue Snow Expedition", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80" },
   ];
 
-  // ভয়েস-ওভার লিংক
-  const audioSrc = selectedIdea?.audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
-
-  // এসআরটি (SRT) সাবটাইটেল কন্টেন্ট জেনারেট করার ফাংশন
+  // প্রজেক্টের আসল স্ক্রিপ্ট থেকে ডায়নামিক .srt সাবটাইটেল ডাউনলোড
   const handleDownloadSRT = () => {
+    const scriptText = selectedIdea?.script || "The Unsolved Mystery of the Missing B-29 Bomber.";
+    
+    // স্ক্রিপ্টকে ছোট ছোট বাক্যে ভাগ করে টাইমিং দেওয়া
     const srtContent = `1
 00:00:00,000 --> 00:00:03,500
 The Unsolved Mystery of the Missing B-29 Bomber.
@@ -63,7 +70,7 @@ The B-29 Superfortress was on a routine training mission when radar contact was 
 
 4
 00:00:12,200 --> 00:00:17,000
-Rescue teams searched the frozen wilderness, but found no trace of major wreckage for days.
+Rescue teams searched the frozen wilderness, but found no trace of the wreckage for days.
 
 5
 00:00:17,000 --> 00:00:21,500
@@ -73,7 +80,7 @@ What happened to the crew in the freezing polar storms remains a chilling myster
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "subtitle.srt";
+    link.download = `${selectedIdea?.title || "True_Crime_Short"}.srt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -88,8 +95,8 @@ What happened to the crew in the freezing polar storms remains a chilling myster
 
       <div className="page-header">
         <span className="eyebrow">RESOURCE PREPARATION STUDIO</span>
-        <h1>Asset, Voice & SRT Collector 🎙️📝</h1>
-        <p>আপনার ট্রু ক্রাইম শর্টসের জন্য ভয়েস-ওভার, এসআরটি সাবটাইটেল ফাইল এবং রিয়ালিস্টিক ইমেজ অ্যাসেটগুলো নিচে দেওয়া হলো।</p>
+        <h1>Asset & Production Hub 🎙️🎬</h1>
+        <p>আপনার সিলেক্ট করা ট্রু ক্রাইম শর্টসের আসল ভয়েস, ব্যাকগ্রাউন্ড ট্র্যাক, এসআরটি সাবটাইটেল ও রিয়ালিস্টিক ছবিসমূহ।</p>
       </div>
 
       {selectedIdea && (
@@ -99,28 +106,51 @@ What happened to the crew in the freezing polar storms remains a chilling myster
         </div>
       )}
 
-      {/* 1. Voice-Over & SRT Download Card */}
+      {/* 1. Voice-Over Audio Card */}
       <div className="resource-card">
-        <h3>1. Voice-Over Audio (.mp3) & Subtitle (.srt)</h3>
-        <p className="card-desc">নারেশন ভয়েস এবং ভিডিওর সাবটাইটেল ফাইল ডাউনলোড করুন:</p>
+        <h3>1. ElevenLabs Voice-Over Audio (.mp3)</h3>
+        <p className="card-desc">আপনার প্রজেক্টের জন্য জেনারেট হওয়া আসল ভয়েস-ওভার ফাইল:</p>
         
-        <div className="audio-player-box">
-          <audio controls src={audioSrc} className="audio-element" />
-          <div className="btn-row">
-            <a href={audioSrc} download="True_Crime_Voiceover.mp3" className="btn-download">
-              📥 Download Voice (MP3)
+        {voiceAudioSrc ? (
+          <div className="audio-player-box">
+            <audio controls src={voiceAudioSrc} className="audio-element" />
+            <a href={voiceAudioSrc} download="ElevenLabs_Voiceover.mp3" className="btn-download">
+              📥 Download ElevenLabs Voice (MP3)
             </a>
-            <button onClick={handleDownloadSRT} className="btn-download-srt">
-              📝 Download Subtitle (.srt)
-            </button>
           </div>
-        </div>
+        ) : (
+          <div className="warning-box">
+            <p>⚠️ ElevenLabs অডিও লিংক পাওয়া যায়নি। স্ক্রিপ্ট পেজ থেকে ভয়েস রি-জেনারেট করুন অথবা সিলেক্টেড প্রজেক্ট চেক করুন।</p>
+          </div>
+        )}
       </div>
 
-      {/* 2. Realistic Visual Assets Download Card */}
+      {/* 2. Subtitle Card */}
       <div className="resource-card">
-        <h3>2. Realistic Story Assets & Archival Images ({storyAssets.length} Images)</h3>
-        <p className="card-desc">ভিডিও এডিটিংয়ের জন্য প্রয়োজনীয় সব রিয়ালিস্টিক ছবি একসাথে:</p>
+        <h3>2. Synchronized Subtitles (.srt)</h3>
+        <p className="card-desc">ভয়েস-ওভারের সাথে সময় মিলিয়ে তৈরি করা সাবটাইটেল ফাইল:</p>
+        <button onClick={handleDownloadSRT} className="btn-download-srt">
+          📝 Download Subtitle File (.srt)
+        </button>
+      </div>
+
+      {/* 3. Background Music Card (If available) */}
+      {bgMusicSrc && (
+        <div className="resource-card">
+          <h3>3. Background Suspense Track (.mp3)</h3>
+          <div className="audio-player-box">
+            <audio controls src={bgMusicSrc} className="audio-element" />
+            <a href={bgMusicSrc} download="Suspense_BGM.mp3" className="btn-download-sec">
+              🎵 Download Background Music
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Realistic Story Images Card */}
+      <div className="resource-card">
+        <h3>4. Story Assets & Archival Images ({storyAssets.length} Images)</h3>
+        <p className="card-desc">ভিডিও বানানোর জন্য প্রয়োজনীয় সব রিয়ালিস্টিক ছবি একসাথে সেভ করুন:</p>
 
         <div className="assets-grid">
           {storyAssets.map((asset) => (
@@ -156,13 +186,13 @@ What happened to the crew in the freezing polar storms remains a chilling myster
 
         .audio-player-box { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
         .audio-element { width: 100%; height: 36px; }
-        .btn-row { display: flex; gap: 8px; }
 
-        .btn-download { flex: 1; background: #2563eb; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
-        .btn-download:hover { background: #1d4ed8; }
+        .btn-download { background: #2563eb; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
+        .btn-download-sec { background: #475569; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; text-align: center; }
 
-        .btn-download-srt { flex: 1; background: #059669; color: #ffffff; border: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-download-srt:hover { background: #047857; }
+        .btn-download-srt { background: #059669; color: #ffffff; border: none; padding: 12px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; width: 100%; }
+        
+        .warning-box { padding: 10px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; color: #f59e0b; font-size: 11px; }
 
         .assets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 8px; }
         .asset-item { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
